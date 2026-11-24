@@ -78,15 +78,17 @@ export function makeHero() {
   const quill = new THREE.Group(); quill.position.set(0.07, -0.54, 0.24); armR.add(quill);
   part(quill, G.cyl, Gl(0xffffff, 'quill'), 0.06, 1.8, 0.06, 0, 0, 0.6).rotation.x = Math.PI / 2;
   part(quill, G.cone4, gold, 0.15, 0.4, 0.08, 0, 0, 1.68).rotation.x = Math.PI / 2;
-  part(quill, G.box, Gl(0xf0e8ff, 'quill'), 0.03, 0.46, 0.85, 0, 0.19, -0.02).rotation.x = 0.2;
-  part(quill, G.box, Gl(0xf0e8ff, 'quill'), 0.03, 0.32, 0.55, 0, -0.11, -0.1).rotation.x = -0.25;
+  part(quill, G.oct, Gl(0xf0e8ff, 'quill'), 0.03, 0.44, 1.0, 0, 0.13, -0.1).rotation.x = 0.16;      // the feather: a leaf, pointed at both ends
+  part(quill, G.oct, Gl(0xf0e8ff, 'quill'), 0.03, 0.26, 0.7, 0, -0.08, -0.16).rotation.x = -0.2;
   const tipMark = new THREE.Object3D(); tipMark.position.set(0, 0, 1.85); quill.add(tipMark);
   const baseMark = new THREE.Object3D(); baseMark.position.set(0, 0, 1.25); quill.add(baseMark);
-  // the SEAL: a heavy stamp on a long handle. Slow, wide, and it shakes the page.
+  // the BLADE: a broad letter-opener as long as the Scribe is tall. Slow, wide, and it shakes the page.
   const mark = (g, z) => { const o = new THREE.Object3D(); o.position.set(0, 0, z); g.add(o); return o; };
   const seal = new THREE.Group(); seal.position.copy(quill.position); armR.add(seal);
-  part(seal, G.cyl, H(0xe0d0b0, 'wood'), 0.08, 1.8, 0.08, 0, 0, 0.6).rotation.x = Math.PI / 2;
-  part(seal, G.box, gold, 0.56, 0.56, 0.7, 0, 0, 1.55); part(seal, G.box, H(0xffffff, 'brick'), 0.66, 0.66, 0.16, 0, 0, 1.95);
+  part(seal, G.cyl, H(0xe0d0b0, 'wood'), 0.09, 0.5, 0.09, 0, 0, 0.02).rotation.x = Math.PI / 2;      // grip
+  part(seal, G.sph, gold, 0.17, 0.17, 0.17, 0, 0, -0.27);                                           // pommel
+  part(seal, G.oct, gold, 0.62, 0.1, 0.16, 0, 0, 0.3);                                              // guard, pointed at both ends
+  part(seal, G.cone4, Gl(0xeef4ff, 'quill'), 0.4, 1.85, 0.07, 0, 0, 1.25).rotation.x = Math.PI / 2;   // the blade tapers to a point
   // the NIBS: two short blades. Fast, close, light.
   const nibs = new THREE.Group(); nibs.position.copy(quill.position); armR.add(nibs);
   part(nibs, G.cone4, Gl(0xffffff, 'quill'), 0.16, 1.0, 0.06, 0, 0, 0.6).rotation.x = Math.PI / 2;
@@ -96,8 +98,8 @@ export function makeHero() {
   part(armL, G.cyl, coat, 0.17, 0.62, 0.17, -0.05, -0.26, 0.12).rotation.x = -0.5;
   part(armL, G.sph, skin, 0.15, 0.15, 0.15, -0.07, -0.52, 0.28);
   const lantern = new THREE.Group(); lantern.position.set(-0.07, -0.88, 0.3); armL.add(lantern);
-  part(lantern, G.box, gold, 0.26, 0.32, 0.26);
-  part(lantern, G.cone4, L(0xa89070, 'metal'), 0.38, 0.17, 0.38, 0, 0.25, 0).rotation.y = Math.PI / 4;
+  part(lantern, G.cyl, gold, 0.25, 0.3, 0.25);                                      // round, so it never reads as a block stuck to the weapon
+  part(lantern, G.cone, L(0xa89070, 'metal'), 0.36, 0.18, 0.36, 0, 0.24, 0);
   part(lantern, G.cyl, L(0xa89070, 'metal'), 0.04, 0.24, 0.04, 0, 0.38, 0);
   const arc = new THREE.Mesh(G.arc, Gl(0xffffff, 'slash', { side: THREE.DoubleSide }));
   const arcWrap = new THREE.Group(); arcWrap.rotation.y = -Math.PI / 2; g.add(arcWrap);

@@ -25,7 +25,7 @@ Something is deleting the world one word at a time. You are the last Scribe. The
 ## Weapons, magic, elixirs
 
 - **QUILL** (from the start): quick three-hit combo ending in a spin.
-- **SEAL** (level 2): a heavy stamp. Slow, triple damage, and it shakes the page where it lands.
+- **BLADE** (level 2): a broad letter-opener. Slow, triple damage, and it shakes the page where it lands.
 - **NIBS** (level 4): twin blades. Short reach, very fast.
 - **FIRE** (key 1, 20 ink): a fireball that bursts and leaves the ground burning. The ground letters themselves turn into `^ * ~` flames and keep hurting whatever stands in them.
 - **BOLT** (key 2, 30 ink, level 3): lightning that jumps between up to four enemies, drawn as jagged `/ \ #` strokes on the ground and in the air.

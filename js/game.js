@@ -264,7 +264,7 @@ function updateHorse(dt) {
 // ---------------------------------------------------------------- weapons, magic, elixirs, levels
 const WEAPONS = [
   { name: 'QUILL', dmg: 1, range: 1.8, half: 1.25, dur: 0.22, cd: 0.25, hitAt: 0.28, spin: true, snd: 'slash', lvl: 1 },
-  { name: 'SEAL', dmg: 3, range: 2.4, half: 1.5, dur: 0.44, cd: 0.66, hitAt: 0.55, slam: true, snd: 'spin', lvl: 2 },
+  { name: 'BLADE', dmg: 3, range: 2.4, half: 1.5, dur: 0.44, cd: 0.66, hitAt: 0.55, slam: true, snd: 'spin', lvl: 2 },
   { name: 'NIBS', dmg: 0.6, range: 1.45, half: 1.0, dur: 0.11, cd: 0.12, hitAt: 0.3, snd: 'slash', lvl: 4 },
 ];
 const SPELLS = { fire: { cost: 20, lvl: 1 }, bolt: { cost: 30, lvl: 3 } };
