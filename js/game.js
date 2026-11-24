@@ -165,6 +165,7 @@ function moveEnt(e, dx, dy, r) {
 
 // ---------------------------------------------------------------- player
 function hurtPlayer(dmg, fx, fy, kb = 7) {
+  if (S.god) return;      // filming only
   if (P.dashT > 0 && S.mode === 'play' && S.t - (P.missT || -9) > 0.5) { P.missT = S.t; floatText(P.x, P.y, 2.6, 'miss', 'miss'); }
   if (P.inv > 0 || P.dashT > 0 || S.mode !== 'play' || P.up) return;
   if (P.mounted) dismount();
