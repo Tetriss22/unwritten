@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>UNWRITTEN — an ASCII action tale in five chapters</title>
+<meta name="description" content="Something is deleting the world one word at a time. Collect the letters, write it back. A browser game drawn entirely in text.">
+<meta property="og:title" content="UNWRITTEN">
+<meta property="og:description" content="An ASCII action tale in five chapters. Plays in the browser.">
+<meta name="theme-color" content="#05060c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%2305060c%27/%3E%3Ctext x=%2716%27 y=%2724%27 font-family=%27monospace%27 font-weight=%27bold%27 font-size=%2724%27 text-anchor=%27middle%27 fill=%27%23fff1c9%27%3EU%3C/text%3E%3C/svg%3E">
+<style>
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: block; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/jetbrains-mono-latin-800-normal.woff2") format("woff2"); font-weight: 800; font-display: block; }
+:root { --ink: #e9e6f5; --dim: #8a86a8; --gold: #fff1c9; --pink: #f3a0c8; --red: #ff3a5a; --bg: #05060c; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; overscroll-behavior: none; }
+body { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-weight: 500; color: var(--ink); user-select: none; -webkit-user-select: none; touch-action: none; }
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.layer { position: fixed; inset: 0; pointer-events: none; }
+#hud { padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); opacity: 0; transition: opacity .6s; }
+#hud.on { opacity: 1; }
+#chapter { font-size: 11px; letter-spacing: .22em; color: var(--dim); }
+#hearts { margin-top: 6px; font-size: 20px; letter-spacing: .12em; color: var(--pink); text-shadow: 0 0 12px rgba(243,160,200,.5); }
+#hearts i { font-style: normal; color: #3a3650; text-shadow: none; }
+#word { margin-top: 8px; font-size: 24px; font-weight: 800; letter-spacing: .34em; color: var(--gold); text-shadow: 0 0 14px rgba(255,241,201,.45); }
+#word i { font-style: normal; color: #4a4668; text-shadow: none; }
+#word.done { animation: pulse 1.2s ease-in-out 3; }
+@keyframes pulse { 50% { color: #fff; text-shadow: 0 0 26px #fff1c9; } }
+#tools { position: absolute; top: max(12px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); display: flex; gap: 8px; pointer-events: auto; }
+button, a.btn { font: inherit; text-decoration: none; display: inline-block; color: var(--ink); background: rgba(10,11,22,.72); border: 1px solid #3a3860; padding: 8px 12px; cursor: pointer; letter-spacing: .12em; font-size: 12px; }
+button:hover, button:focus-visible, a.btn:hover, a.btn:focus-visible { border-color: var(--gold); color: var(--gold); outline: none; }
+#boss { position: absolute; left: 50%; top: max(16px, env(safe-area-inset-top)); transform: translateX(-50%); width: min(520px, 62vw); text-align: center; display: none; }
+#boss b { display: block; font-size: 12px; letter-spacing: .4em; color: var(--red); margin-bottom: 6px; }
+#bossbar { height: 10px; border: 1px solid var(--red); padding: 1px; }
+#bossbar div { height: 100%; width: 100%; background: var(--red); transition: width .15s; box-shadow: 0 0 14px rgba(255,58,90,.7); }
+#msg { position: absolute; left: 50%; bottom: 17%; transform: translateX(-50%); width: min(820px, 90vw); text-align: center; font-size: clamp(13px, 1.9vw, 19px); line-height: 1.5; color: var(--ink); text-shadow: 0 0 10px #000, 0 0 3px #000; min-height: 1.5em; }
+#msg span { background: rgba(5,6,12,.62); padding: 3px 10px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+#hint { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); font-size: 11px; letter-spacing: .16em; color: var(--dim); white-space: nowrap; }
+#arrow { position: absolute; left: 0; top: 0; font-size: 26px; font-weight: 800; color: var(--gold); text-shadow: 0 0 12px rgba(255,241,201,.8); display: none; will-change: transform; }
+#arrow small { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); font-size: 10px; letter-spacing: .2em; white-space: nowrap; }
+.screen { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; pointer-events: auto; }
+.screen.on { display: flex; }
+#title { background: radial-gradient(ellipse at center, rgba(5,6,12,.1) 0%, rgba(5,6,12,.72) 80%); }
+h1 { margin: 0; font-weight: 800; font-size: clamp(34px, 9.4vw, 118px); letter-spacing: .2em; padding-left: .2em; color: #fff; text-shadow: 0 0 30px rgba(142,162,255,.75), 0 0 80px rgba(243,160,200,.35); line-height: 1; }
+h1 s { color: var(--red); text-decoration-thickness: .06em; text-decoration-color: var(--red); }
+.tag { margin-top: 18px; font-size: clamp(11px, 1.6vw, 15px); letter-spacing: .3em; color: var(--pink); }
+.lead { margin-top: 26px; max-width: 620px; font-size: clamp(12px, 1.5vw, 15px); line-height: 1.7; color: #c8c4e0; }
+.go { margin-top: 30px; font-size: 15px; padding: 14px 30px; border-color: var(--gold); color: var(--gold); letter-spacing: .3em; animation: blink 1.6s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .55; } }
+#chapters { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+#chapters button[disabled] { opacity: .3; cursor: default; }
+.keys { margin-top: 26px; font-size: 11px; letter-spacing: .14em; color: var(--dim); line-height: 2; }
+#card { background: rgba(5,6,12,.0); transition: opacity .5s; }
+#card .n { font-size: clamp(12px, 1.8vw, 16px); letter-spacing: .5em; color: var(--pink); }
+#card .t { margin-top: 12px; font-size: clamp(26px, 6vw, 68px); font-weight: 800; letter-spacing: .16em; color: #fff; text-shadow: 0 0 30px rgba(142,162,255,.7), 0 0 4px #000; }
+#card .s { margin-top: 12px; font-size: clamp(11px, 1.6vw, 15px); letter-spacing: .24em; color: var(--dim); text-shadow: 0 0 6px #000; }
+#end { background: rgba(5,6,12,.78); }
+#end .t { font-size: clamp(34px, 9vw, 110px); font-weight: 800; letter-spacing: .2em; color: var(--gold); text-shadow: 0 0 40px rgba(255,241,201,.6); }
+#end .row { margin-top: 26px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#pause { background: rgba(5,6,12,.7); }
+#touch { display: none; pointer-events: auto; }
+body.touch #touch { display: block; }
+body.touch #hint { display: none; }
+body.touch #msg { bottom: 27%; }
+#stick { position: absolute; left: 0; top: 0; width: 55%; height: 100%; }
+#base { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border: 1px solid rgba(233,230,245,.35); border-radius: 50%; display: none; }
+#knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(233,230,245,.3); }
+.tb { position: absolute; width: 78px; height: 78px; border-radius: 50%; border: 1px solid rgba(255,241,201,.6); color: var(--gold); font-size: 11px; letter-spacing: .1em; display: flex; align-items: center; justify-content: center; background: rgba(10,11,22,.45); }
+.tb.down { background: rgba(255,241,201,.3); }
+#bA { right: max(20px, env(safe-area-inset-right)); bottom: max(44px, env(safe-area-inset-bottom)); width: 92px; height: 92px; }
+#bD { right: calc(max(20px, env(safe-area-inset-right)) + 104px); bottom: max(24px, env(safe-area-inset-bottom)); }
+#err { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 30px; text-align: center; color: var(--pink); line-height: 1.7; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="UNWRITTEN game view"></canvas>
+
+<div id="hud" class="layer">
+  <div id="chapter"></div>
+  <div id="hearts" aria-label="health"></div>
+  <div id="word" aria-label="word to write"></div>
+  <div id="tools"><button id="snd" type="button" aria-label="toggle sound">SOUND ON</button><button id="pz" type="button" aria-label="pause">II</button></div>
+  <div id="boss"><b>THE EDITOR</b><div id="bossbar"><div></div></div></div>
+  <div id="arrow">&gt;<small></small></div>
+  <div id="msg"></div>
+  <div id="hint"></div>
+</div>
+
+<div id="touch" class="layer">
+  <div id="stick"><div id="base"><div id="knob"></div></div></div>
+  <div id="bD" class="tb">DASH</div>
+  <div id="bA" class="tb">STRIKE</div>
+</div>
+
+<div id="card" class="screen" style="pointer-events:none"><div class="n"></div><div class="t"></div><div class="s"></div></div>
+
+<div id="title" class="screen on">
+  <h1>UN<s>WRITTEN</s></h1>
+  <div class="tag">AN ASCII ACTION TALE IN FIVE CHAPTERS</div>
+  <div class="lead">Something is deleting the world, one word at a time. You are the last Scribe. Find the letters, beat what guards them, and write the world back.</div>
+  <button id="start" class="go" type="button">BEGIN</button>
+  <div id="chapters"></div>
+  <div class="keys" id="keys">WASD / ARROWS move &nbsp;·&nbsp; CLICK / J strike &nbsp;·&nbsp; SHIFT / K / RIGHT CLICK dash &nbsp;·&nbsp; M sound &nbsp;·&nbsp; ESC pause</div>
+</div>
+
+<div id="pause" class="screen"><div class="t" style="font-size:32px;font-weight:800;letter-spacing:.3em">PAUSED</div><div class="row" style="margin-top:22px;display:flex;gap:10px"><button id="resume" type="button">RESUME</button><button id="quit" type="button">TITLE</button></div></div>
+
+<div id="end" class="screen">
+  <div class="t">THE END</div>
+  <div class="tag">YOU WROTE IT YOURSELF</div>
+  <div class="lead" id="stats"></div>
+  <div class="row"><button id="again" type="button">WRITE IT AGAIN</button><a id="share" class="btn" target="_blank" rel="noopener" href="https://x.com/intent/post">POST YOUR TIME</a></div>
+</div>
+
+<div id="err">This game needs WebGL2. Try a current Chrome, Safari, Firefox or Edge.</div>
+<script type="module" src="js/game.js"></script>
+</body>
+</html>
