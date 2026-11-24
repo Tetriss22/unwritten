@@ -27,6 +27,7 @@ const G = {
   oct: new THREE.OctahedronGeometry(0.5, 0),
   tet: new THREE.TetrahedronGeometry(0.5, 0),
   tor: new THREE.TorusGeometry(0.5, 0.07, 6, 20),
+  torThin: new THREE.TorusGeometry(0.5, 0.022, 5, 28),
   arc: new THREE.RingGeometry(0.84, 1.0, 20, 1, -1.15, 2.3),
   ring: new THREE.RingGeometry(0.86, 1.0, 28),
   frust: new THREE.CylinderGeometry(0.3, 0.5, 1, 14),
@@ -97,6 +98,47 @@ export function makeHero() {
   return { g, body, head, tip, armR, armL, quill, lantern, scarf, arc, spin, legs, robe, tipMark, baseMark };
 }
 
+// ---------- the paper horse: same fine white letters as the Scribe, so the pair read as one
+export function makeHorse() {
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const H = (hex, kind) => gmat(hex, kind, { lift: 0.5 }), white = H(0xffffff, 'coat'), grey = H(0xd8d4f0, 'dark'), mane = Gl(0xff7fc0, 'scarf');
+  part(body, G.box, white, 0.72, 0.72, 1.75, 0, 1.3, 0);
+  part(body, G.sph, white, 0.8, 0.8, 0.8, 0, 1.32, 0.75); part(body, G.sph, white, 0.82, 0.82, 0.82, 0, 1.32, -0.75);
+  const neck = new THREE.Group(); neck.position.set(0, 1.55, 0.85); body.add(neck);
+  part(neck, G.box, white, 0.34, 0.95, 0.42, 0, 0.35, 0.2).rotation.x = 0.6;
+  part(neck, G.box, white, 0.32, 0.36, 0.72, 0, 0.82, 0.62).rotation.x = 0.25;
+  part(neck, G.cone4, grey, 0.12, 0.26, 0.12, -0.11, 1.08, 0.38); part(neck, G.cone4, grey, 0.12, 0.26, 0.12, 0.11, 1.08, 0.38);
+  for (let i = 0; i < 4; i++) part(neck, G.box, mane, 0.1, 0.3, 0.22, 0, 0.75 - i * 0.2, 0.1 - i * 0.1).rotation.x = 0.6;
+  const tail = part(body, G.box, mane, 0.14, 0.9, 0.16, 0, 1.15, -1.05); tail.rotation.x = -0.5;
+  const legs = [[-0.24, 0.62], [0.24, 0.62], [-0.24, -0.62], [0.24, -0.62]].map(([x, z]) => {
+    const l = new THREE.Group(); l.position.set(x, 1.0, z); body.add(l);
+    part(l, G.cyl, white, 0.17, 1.0, 0.17, 0, -0.5, 0); part(l, G.box, grey, 0.2, 0.14, 0.24, 0, -0.95, 0.02);
+    return l;
+  });
+  g.traverse(m => { if (m.isMesh) m.layers.set(3); });
+  return { g, body, neck, legs, tail };
+}
+// ---------- the people who stayed
+export function makeNPC(k) {
+  const g = new THREE.Group(), cols = [0xffd98a, 0x9be070, 0xff9a5c, 0x8ad8ff, 0xffa8d0], c = cols[k % cols.length];
+  const robe = gmat(c, 'cape', { lift: 0.35 }), skin = gmat(0xffe6d0, 'skin', { lift: 0.35 });
+  part(g, G.frust, robe, 0.95, 1.5, 0.9, 0, 0.75, 0);
+  part(g, G.frust, robe, 0.8, 0.3, 0.75, 0, 1.6, 0);
+  part(g, G.sph, skin, 0.4, 0.42, 0.4, 0, 1.95, 0.03);
+  part(g, G.cyl, robe, 0.75, 0.07, 0.75, 0, 2.15, 0); part(g, G.cone, robe, 0.42, 0.4, 0.42, 0, 2.36, 0);
+  part(g, G.sph, Gl(0x201830, 'eye'), 0.07, 0.07, 0.05, -0.09, 1.96, 0.21); part(g, G.sph, Gl(0x201830, 'eye'), 0.07, 0.07, 0.05, 0.09, 1.96, 0.21);
+  return g;
+}
+export function makeCampfire() {
+  const g = new THREE.Group(), w = L(0xd0a878, 'wood', true);
+  for (let i = 0; i < 4; i++) { const m = part(g, G.box, w, 0.16, 0.16, 1.0, 0, 0.12, 0); m.rotation.y = i * 0.8; }
+  for (let i = 0; i < 6; i++) part(g, G.ico, L(0xc8c4e0, 'stone', true), 0.26, 0.2, 0.26, Math.cos(i * 1.047) * 0.62, 0.08, Math.sin(i * 1.047) * 0.62);
+  const f1 = part(g, G.cone, Gl(0xff8a2a, 'fire'), 0.6, 1.1, 0.6, 0, 0.7, 0); f1.userData.flame = true;
+  const f2 = part(g, G.cone, Gl(0xffd27a, 'fire'), 0.34, 0.7, 0.34, 0.05, 0.5, 0.05); f2.userData.flame = true;
+  g.traverse(m => { if (m.isMesh && m.userData.flame) m.layers.set(2); });
+  return g;
+}
+
 // ---------- the unwriters: heavy purple symbols, red eyes
 export function makeEnemy(type) {
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
@@ -158,7 +200,7 @@ export function makeLetter(ch) {
   lit.scale.set(1.7, 1.7, 1); dim.scale.set(1.7, 1.7, 1); lit.position.y = dim.position.y = 1.3;
   lit.visible = false; g.add(lit, dim);
   const cage = new THREE.Group(); cage.position.y = 1.3; g.add(cage);
-  for (let i = 0; i < 3; i++) { const r = part(cage, G.tor, Gl(0xff3a5a, 'ink2'), 2.0, 2.0, 2.0); r.rotation.set(i * 1.05, i * 2.1, 0); }
+  for (let i = 0; i < 3; i++) { const r = part(cage, G.torThin, Gl(0xff3a5a, 'ink2'), 2.0, 2.0, 2.0); r.rotation.set(i * 1.05, i * 2.1, 0); }
   return { g, lit, dim, cage };
 }
 export function makeHeart() {

@@ -17,16 +17,16 @@ const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random(
 
 const audio = new Audio();
 let R = null, W = null;
-const S = { mode: 'boot', land: 0, landT: 0, t: 0, camX: 0, camY: 0, shake: 0, hitstop: 0, flash: 0, reveal: 0, revealTo: 0, amb: 0, deaths: 0, runT: 0, paused: false, timers: [], zoom: 1.3, zoomTo: 1.3, zMin: 0.1, env: null };
-const P = { x: 0, y: 0, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: 5, maxHp: 5, inv: 0, dashT: 0, dashCd: 0, dx: 0, dy: 0, atkT: 0, atkDur: 0.24, atkCd: 0, combo: 0, comboT: 0, hitDone: true, walk: 0, stepT: 0, burnT: 0, cx: 0, cy: 0, m: null };
+const S = { mode: 'boot', land: 0, landT: 0, t: 0, camX: 0, camY: 0, shake: 0, hitstop: 0, flash: 0, reveal: 0, revealTo: 0, amb: 0, deaths: 0, runT: 0, paused: false, timers: [], zoom: 1.0, zoomTo: 1.0, zMin: 0.1, env: null };
+const P = { x: 0, y: 0, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: 5, maxHp: 5, inv: 0, dashT: 0, dashCd: 0, dx: 0, dy: 0, atkT: 0, atkDur: 0.24, atkCd: 0, combo: 0, comboT: 0, hitDone: true, walk: 0, stepT: 0, burnT: 0, cx: 0, cy: 0, m: null, h: 0, hTo: 0, up: null, mounted: false, zoomBack: 1.0 };
 const keys = new Set();
-const input = { mx: 0, my: 0, mouseT: -99, attack: false, held: false, dash: false, sx: 0, sy: 0, stickId: null, ox: 0, oy: 0, pinch: 0 };
+const input = { mx: 0, my: 0, mouseT: -99, attack: false, held: false, dash: false, use: false, ride: false, fire: false, sx: 0, sy: 0, stickId: null, ox: 0, oy: 0, pinch: 0 };
 const after = (sec, fn) => S.timers.push({ t: sec, fn });
 const TRAIL = 12, WHITE3 = new THREE.Color(0xffffff);
 const RB = Array.from({ length: 6 }, () => ({ x: 0, z: 0, vx: 0, vz: 0 }));   // the coat's rings, each on a spring
 
 // ---------------------------------------------------------------- save
-const SAVE = 'unwritten.world.v1';
+const SAVE = 'unwritten.world.v2';
 const readSave = () => { try { return JSON.parse(localStorage.getItem(SAVE) || 'null'); } catch (e) { return null; } };
 const clearSave = () => { try { localStorage.removeItem(SAVE); } catch (e) { /* storage unavailable */ } };
 function save() {
@@ -118,9 +118,12 @@ function loadWorld() {
     bc.channel = 0; bc.g.visible = land.i < 4; land.beacon = bc;
     if (land.i < 4) B.T.solidCircle(land.goal.x, land.goal.y, 0.8);
   }
+  W.horse = M.makeHorse(); W.horse.x = B.start.x - 2.2; W.horse.y = B.start.y + 1.2; W.horse.face = 0.4; W.horse.call = false; W.horse.gait = 0; R.root.add(W.horse.g);
+  W.npcs = B.npcs.map(n => { const g = M.makeNPC(n.hue); place(g, n.x, n.y); R.root.add(g); return { ...n, g, ph: rnd(6) }; });
+  W.fire = null; W.said = {};
   if (!P.m) P.m = M.makeHero();
   R.root.add(P.m.g); P.m.g.visible = true;
-  Object.assign(P, { x: B.start.x, y: B.start.y, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: P.maxHp, inv: 0, dashT: 0, atkT: 0, cx: B.start.x, cy: B.start.y });
+  Object.assign(P, { x: B.start.x, y: B.start.y, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: P.maxHp, inv: 0, dashT: 0, atkT: 0, cx: B.start.x, cy: B.start.y, h: 0, hTo: 0, up: null, mounted: false });
   S.camX = P.x; S.camY = P.y; S.land = 0;
   const d = LANDS[0];
   S.env = { amb: d.ambient.slice(), bg: d.bg.slice(), dark: d.dark, lightR: d.lightR, a3c: new THREE.Color(d.amb3d[0]), a3i: d.amb3d[1], mc: new THREE.Color(d.moon[0]), mi: d.moon[1] };
@@ -158,7 +161,8 @@ function moveEnt(e, dx, dy, r) {
 // ---------------------------------------------------------------- player
 function hurtPlayer(dmg, fx, fy, kb = 7) {
   if (P.dashT > 0 && S.mode === 'play' && S.t - (P.missT || -9) > 0.5) { P.missT = S.t; floatText(P.x, P.y, 2.6, 'miss', 'miss'); }
-  if (P.inv > 0 || P.dashT > 0 || S.mode !== 'play') return;
+  if (P.inv > 0 || P.dashT > 0 || S.mode !== 'play' || P.up) return;
+  if (P.mounted) dismount();
   P.hp -= dmg; P.inv = 1.15;
   const a = Math.atan2(P.y - fy, P.x - fx); P.kx = Math.cos(a) * kb; P.ky = Math.sin(a) * kb;
   S.flash = 1; S.shake = Math.max(S.shake, 0.5); S.hitstop = 0.09; audio.play('hurt');
@@ -183,8 +187,71 @@ function respawn() {
   for (const s of W.shots) removeObj(s.g); W.shots = [];
   W.lines = []; W.slams = [];
   if (W.bossState === 'fight') { W.bossState = 'wait'; W.boss = null; $('boss').style.display = 'none'; audio.intense = false; }
-  Object.assign(P, { x: P.cx, y: P.cy, vx: 0, vy: 0, kx: 0, ky: 0, hp: P.maxHp, inv: 1.6, dashT: 0, atkT: 0 });
+  Object.assign(P, { x: P.cx, y: P.cy, vx: 0, vy: 0, kx: 0, ky: 0, hp: P.maxHp, inv: 1.6, dashT: 0, atkT: 0, up: null, hTo: 0, h: 0, mounted: false });
   P.m.g.visible = true; S.camX = P.x; S.camY = P.y; S.mode = 'play'; S.revealTo = 1; hudHearts();
+}
+
+// ---------------------------------------------------------------- riding, climbing, fires, talking
+function once(key, text, hold = 3) { if (!W.said[key]) { W.said[key] = 1; say(text, hold); } }
+function dismount() {
+  if (!P.mounted) return;
+  const hz = W.horse; P.mounted = false; hz.x = P.x; hz.y = P.y; hz.face = P.face; hz.call = false;
+  const sx = -Math.sin(P.face) * 0.95, sy = Math.cos(P.face) * 0.95;
+  if (!W.T.blocked(P.x + sx, P.y + sy, 0.3)) { P.x += sx; P.y += sy; } else if (!W.T.blocked(P.x - sx, P.y - sy, 0.3)) { P.x -= sx; P.y -= sy; }
+  P.vx *= 0.3; P.vy *= 0.3;
+}
+function ride() {
+  if (S.mode !== 'play' || P.up) return;
+  if (P.mounted) return dismount();
+  const hz = W.horse; audio.play('whistle');
+  if (dist(hz.x, hz.y, P.x, P.y) > 14) { hz.x = P.x - CY * 12 - SY * 2; hz.y = P.y + SY * 12 - CY * 2; }   // it comes in from the left edge of the screen
+  hz.call = true;
+}
+function interactTarget() {
+  if (S.mode !== 'play') return null;
+  if (P.up) return { kind: 'down', x: P.up.x, y: P.up.y, h: P.up.top + 3.2, text: 'climb down' };
+  let best = null, bd = 1e9;
+  for (const t of W.B.towers) { const d = dist(P.x, P.y, t.x, t.y) - t.base; if (d < 1.9 && d < bd) { bd = d; best = { kind: 'tower', ref: t, x: t.x, y: t.y, h: 1.6, text: 'climb' }; } }
+  for (const n of W.npcs) { const d = dist(P.x, P.y, n.x, n.y) - 0.5; if (d < 2.4 && d < bd) { bd = d; best = { kind: 'npc', ref: n, x: n.x, y: n.y, h: 3.3, text: 'talk' }; } }
+  return best;
+}
+function interact() {
+  const t = interactTarget(); if (!t) return;
+  if (t.kind === 'down') {
+    const tw = P.up; P.up = null; P.hTo = 0; S.zoomTo = P.zoomBack;
+    for (let k = 0; k < 8; k++) { const a = Math.atan2(CY, SY) + k * 0.785, x = tw.x + Math.cos(a) * (tw.base + 0.7), y = tw.y + Math.sin(a) * (tw.base + 0.7); if (!W.T.blocked(x, y, 0.3)) { P.x = x; P.y = y; break; } }
+    P.vx = P.vy = 0; audio.play('dash'); return;
+  }
+  if (t.kind === 'tower') {
+    dismount(); const tw = t.ref; P.up = tw; P.x = tw.x; P.y = tw.y; P.hTo = tw.top; P.vx = P.vy = 0; P.atkT = 0;
+    P.zoomBack = S.zoomTo; S.zoomTo = Math.min(S.zoomTo, 0.55); audio.play('free'); pulse(tw.x, tw.y, [1, 0.95, 0.75], 1, 9, 0.8);
+    once('tower', 'High ground. Nothing reaches you up here, and you can read the land.', 3.4); return;
+  }
+  say(t.ref.name + ': "' + t.ref.line + '"', 4.2); audio.play('letter', -5);
+}
+function campfire() {
+  if (S.mode !== 'play' || P.up || P.mounted) return;
+  let x = P.x + Math.cos(P.face) * 1.1, y = P.y + Math.sin(P.face) * 1.1; if (W.T.blocked(x, y, 0.3)) { x = P.x; y = P.y; }
+  if (!W.fire) { const g = M.makeCampfire(); R.root.add(g); g.traverse(m => { if (m.userData.flame) W.flames.push({ m, s: m.scale.clone(), ph: rnd(6) }); }); W.fire = { g, t: 0, heal: 0 }; }
+  W.fire.x = x; W.fire.y = y; W.fire.t = 0; place(W.fire.g, x, y); P.cx = P.x; P.cy = P.y;
+  audio.play('fire'); glow(x, y, 8, 1.6, [1, 0.6, 0.25], 0.8); burst(x, y, 0.5, 10, 0xffb050, 4);
+  once('fire', 'A fire remembers where you stood. Rest by it and it mends you.', 3.4); save();
+}
+function updateHorse(dt) {
+  const hz = W.horse; let sp = 0;
+  if (P.mounted) { hz.x = P.x; hz.y = P.y; hz.face = P.face; sp = Math.hypot(P.vx, P.vy); }
+  else if (hz.call) {
+    const d = dist(hz.x, hz.y, P.x, P.y), a = Math.atan2(P.y - hz.y, P.x - hz.x);
+    if (d < 1.4 && S.mode === 'play' && !P.up) { hz.call = false; P.mounted = true; P.x = hz.x; P.y = hz.y; P.face = hz.face; P.atkT = 0; pulse(P.x, P.y, [1, 1, 1], 0.6, 7, 0.4); once('ride', 'R to get down. Strike and you jump off swinging.', 3); }
+    else { sp = Math.min(13, 4 + d * 1.5); hz.x += Math.cos(a) * sp * dt; hz.y += Math.sin(a) * sp * dt; hz.face = a; }
+  }
+  hz.gait += sp * dt * 1.6;
+  if (sp > 2) { hz.hoofT = (hz.hoofT || 0) - dt * sp; if (hz.hoofT <= 0) { hz.hoofT = 2.6; audio.play('hoof'); if (P.mounted) pulse(hz.x, hz.y, [0.8, 0.9, 0.8], 0.25, 3, 0.25, 0.2); } }
+  place(hz.g, hz.x, hz.y, P.mounted ? P.h : 0); hz.g.rotation.y = rotY(hz.face);
+  const amp = Math.min(0.9, 0.3 + sp * 0.07), sw = sp > 0.5 ? Math.sin(hz.gait) * amp : 0, sw2 = sp > 0.5 ? Math.sin(hz.gait + 1.9) * amp : 0;
+  hz.legs[0].rotation.x = sw; hz.legs[1].rotation.x = sw2; hz.legs[2].rotation.x = -sw2; hz.legs[3].rotation.x = -sw;
+  hz.body.position.y = sp > 0.5 ? Math.abs(Math.sin(hz.gait)) * 0.1 : Math.sin(S.t * 1.6) * 0.012;
+  hz.neck.rotation.x = sp > 0.5 ? 0.25 + Math.sin(hz.gait) * 0.08 : Math.sin(S.t * 0.7) * 0.08; hz.tail.rotation.x = -0.5 - Math.min(0.7, sp * 0.07) + Math.sin(S.t * 3) * 0.08;
 }
 
 function startAttack(mx, my, moving) {
@@ -232,6 +299,11 @@ function updatePlayer(dt) {
   const moving = ml > 0.12;
   [mx, my] = [mx * CY + my * SY, -mx * SY + my * CY];     // the camera is turned: up on screen is not north
   p.inv = Math.max(0, p.inv - dt); p.dashCd -= dt; p.atkCd -= dt; p.comboT -= dt;
+  if (input.use) { input.use = false; interact(); }
+  if (input.ride) { input.ride = false; ride(); }
+  if (input.fire) { input.fire = false; campfire(); }
+  if (p.up) { input.attack = input.held = input.dash = false; }
+  if (p.mounted) { input.dash = false; if (input.attack || input.held) dismount(); }
   if (input.dash) {
     input.dash = false;
     if (p.dashCd <= 0 && p.dashT <= 0) {
@@ -246,16 +318,20 @@ function updatePlayer(dt) {
   const tag = W.T.tagAt(p.x, p.y);
   if (p.dashT > 0) { p.dashT -= dt; p.vx = p.dx * 14.5; p.vy = p.dy * 14.5; }
   else {
-    const sp = (p.atkT > 0 ? 1.5 : 4.7) * (tag === 3 ? 0.85 : 1), k = tag === 2 ? 2.2 : (moving ? 10 : 13);
+    const sp = (p.up ? 2.6 : p.mounted ? 10.2 : p.atkT > 0 ? 1.5 : 4.7) * (tag === 3 && !p.up ? 0.72 : 1), k = p.up ? 14 : tag === 2 ? 2.2 : p.mounted ? (moving ? 3.2 : 4.5) : (moving ? 10 : 13);
     p.vx += (mx * sp - p.vx) * Math.min(1, k * dt); p.vy += (my * sp - p.vy) * Math.min(1, k * dt);
   }
   p.kx *= Math.pow(0.0008, dt); p.ky *= Math.pow(0.0008, dt);
-  moveEnt(p, (p.vx + p.kx) * dt, (p.vy + p.ky) * dt, 0.3);
+  if (p.up) {      // on a tower top: free to pace inside the parapet
+    p.x += p.vx * dt; p.y += p.vy * dt; const d = dist(p.x, p.y, p.up.x, p.up.y);
+    if (d > p.up.rad) { p.x = p.up.x + (p.x - p.up.x) / d * p.up.rad; p.y = p.up.y + (p.y - p.up.y) / d * p.up.rad; }
+  } else moveEnt(p, (p.vx + p.kx) * dt, (p.vy + p.ky) * dt, p.mounted ? 0.42 : 0.3);
+  p.h += (p.hTo - p.h) * Math.min(1, dt * 7);
   if (moving && p.atkT <= 0 && p.dashT <= 0) p.face += angDiff(Math.atan2(my, mx), p.face) * Math.min(1, 14 * dt);
   const speed = Math.hypot(p.vx, p.vy);
   p.walk += speed * dt * 2.8;
-  if (speed > 1.5 && p.dashT <= 0) { p.stepT -= dt * speed; if (p.stepT <= 0) { p.stepT = 1.5; audio.play('step'); pulse(p.x, p.y, [0.8, 0.8, 1], 0.22, 2.6, 0.22, 0.15); } }
-  if (tag === 1 && p.dashT <= 0) { p.burnT += dt; if (p.burnT > 0.12) hurtPlayer(1, p.x - p.vx, p.y - p.vy + 0.01, 6); } else p.burnT = 0;
+  if (speed > 1.5 && p.dashT <= 0 && !p.mounted) { p.stepT -= dt * speed; if (p.stepT <= 0) { p.stepT = 1.5; audio.play('step'); pulse(p.x, p.y, [0.8, 0.8, 1], 0.22, 2.6, 0.22, 0.15); } }
+  if (tag === 1 && p.dashT <= 0 && !p.up) { p.burnT += dt; if (p.burnT > 0.12) hurtPlayer(1, p.x - p.vx, p.y - p.vy + 0.01, 6); } else p.burnT = 0;
   if (p.atkT > 0) {
     const el = p.atkDur - p.atkT;
     if (!p.hitDone && el >= 0.06) { p.hitDone = true; doHit(); }
@@ -267,7 +343,8 @@ function updatePlayer(dt) {
 }
 function poseHero(dt) {
   const p = P, m = p.m, play = S.mode === 'play', speed = play ? Math.hypot(p.vx, p.vy) : 0;
-  place(m.g, p.x, p.y); m.g.rotation.y = rotY(p.face);
+  place(m.g, p.x, p.y, p.h + (p.mounted ? 0.82 : 0)); m.g.rotation.y = rotY(p.face);
+  m.legs[0].visible = m.legs[1].visible = !p.mounted;
   const cf = Math.cos(p.face), sf = Math.sin(p.face);
   const wvx = play ? p.vx + p.kx : 0, wvy = play ? p.vy + p.ky : 0;
   const lvx = wvx * sf - wvy * cf, lvz = wvx * cf + wvy * sf;          // velocity in the hero's own frame
@@ -600,6 +677,13 @@ function updateWorld(dt) {
     bc.core.rotation.y += dt * (land.lit ? 2 : 0.4 + bc.channel * 5);
   }
   for (const f of W.flames) { const k = 0.85 + Math.sin(S.t * 9 + f.ph) * 0.12 + Math.sin(S.t * 23 + f.ph * 2) * 0.06; f.m.scale.set(f.s.x * (2 - k), f.s.y * k, f.s.z * (2 - k)); }
+  updateHorse(dt);
+  if (W.fire) {
+    const f = W.fire; f.t += dt; f.heal += dt;
+    if (Math.random() < dt * 7) burst(f.x + rnd(-0.2, 0.2), f.y + rnd(-0.2, 0.2), 0.7, 1, Math.random() < 0.5 ? 0xffb050 : 0xffe9a8, 0.9);
+    if (f.heal > 2.2 && play && P.hp < P.maxHp && dist(P.x, P.y, f.x, f.y) < 3.2) { f.heal = 0; P.hp++; hudHearts(); audio.play('heart'); floatText(P.x, P.y, 2.8, '+1', 'gain'); }
+  }
+  for (const n of W.npcs) { const d = dist(P.x, P.y, n.x, n.y); if (d > 24) continue; n.g.position.y = Math.sin(S.t * 1.8 + n.ph) * 0.03; if (d < 7) n.g.rotation.y += angDiff(rotY(Math.atan2(P.y - n.y, P.x - n.x)), n.g.rotation.y) * Math.min(1, dt * 4); }
   for (const m of W.spins) m.rotation.z += dt * m.userData.spin * (1 + 0.4 * Math.sin(S.t * 0.5));
   for (const f of W.floats) { f.m.position.y = f.y + Math.sin(S.t * 0.9 + f.ph) * 0.25; f.m.rotation.y += dt * 0.3; }
   for (const s of W.shots) {
@@ -675,6 +759,7 @@ function fillUniforms() {
     Ls.push(land.lit ? [g.x, g.y, 12, 1.5, 1, 0.92, 0.7, dist(g.x, g.y, S.camX, S.camY) * 0.3] : [g.x, g.y, 3 + bc.channel * 3, 0.5 + bc.channel, 1, 0.9, 0.7, dist(g.x, g.y, S.camX, S.camY)]);
   }
   if (W.boss) Ls.push([W.boss.x, W.boss.y, 4.5, 0.8, 1, 0.2, 0.35, 0]);
+  if (W.fire) Ls.push([W.fire.x, W.fire.y, 7.5 * (1 + Math.sin(S.t * 9) * 0.04), 1.5 + Math.sin(S.t * 13) * 0.12, 1, 0.62, 0.25, 0.2]);
   for (const g of W.glows) Ls.push([g.x, g.y, g.r, g.int * g.life / g.max, ...g.col, 0.5]);
   Ls.sort((a, b) => a[7] - b[7]);
   for (let i = 0; i < MAX_LIGHTS; i++) {
@@ -682,9 +767,10 @@ function fillUniforms() {
   }
   const pts = R.points; let pi = 0;
   const setP = (x, y, h, col, int, d) => { if (pi < pts.length) { const p = pts[pi++]; place(p, x, y, h); p.color.setRGB(col[0], col[1], col[2]); p.intensity = int; p.distance = d; } };
-  if (S.mode !== 'dead') setP(P.x + SY * 0.4, P.y + CY * 0.4, 1.5, [1, 0.88, 0.7], 9 * fl, env.lightR + 2.5);
+  if (S.mode !== 'dead') setP(P.x + SY * 0.4, P.y + CY * 0.4, 1.5 + P.h, [1, 0.88, 0.7], 9 * fl, env.lightR + 2.5);
   let n1 = null, n2 = null, d1 = 1e9, d2 = 1e9;
   for (const l of W.lamps) { const d = dist(l.x, l.y, S.camX, S.camY); if (d < d1) { d2 = d1; n2 = n1; d1 = d; n1 = l; } else if (d < d2) { d2 = d; n2 = l; } }
+  if (W.fire && dist(W.fire.x, W.fire.y, S.camX, S.camY) < 30) setP(W.fire.x + SY * 0.3, W.fire.y + CY * 0.3, 1.2, [1, 0.6, 0.25], 12, 9);
   for (const l of [n1, n2]) if (l) setP(l.x + SY * 0.3, l.y + CY * 0.3, 1.9, l.col, 6, 6);
   while (pi < pts.length) pts[pi++].intensity = 0;
   const er = [];
@@ -752,7 +838,15 @@ function updateOverlay() {
     e.lab.lastChild.firstChild.style.width = clamp(e.hp / e.maxHp * 100, 0, 100) + '%';
   }
   for (const e of labels) if (e.dead || !W.enemies.includes(e)) { e.lab.remove(); e.lab = null; labels.delete(e); }
-  const you = $('you2'), [hx, hy] = R.toScreen(P.x, P.y, 3.1);
+  const use = near ? interactTarget() : null, pr = $('prompt');
+  if (use) { const tgt = use; const [x, y] = R.toScreen(tgt.x, tgt.y, tgt.h); pr.style.display = 'block'; pr.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`; const tx = (document.body.classList.contains('touch') ? 'USE: ' : '[E] ') + tgt.text; if (pr.textContent !== tx) pr.textContent = tx; } else pr.style.display = 'none';
+  for (const n of W.npcs) {
+    const on = near && dist(P.x, P.y, n.x, n.y) < 9;
+    if (!on) { if (n.lab) n.lab.style.display = 'none'; continue; }
+    if (!n.lab) { n.lab = document.createElement('div'); n.lab.className = 'lab npc'; n.lab.textContent = n.name; $('fx').appendChild(n.lab); }
+    const [x, y] = R.toScreen(n.x, n.y, 2.8); n.lab.style.display = 'block'; n.lab.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+  }
+  const you = $('you2'), [hx, hy] = R.toScreen(P.x, P.y, 3.1 + P.h + (P.mounted ? 0.8 : 0));
   you.style.display = near && P.m.g.visible ? 'block' : 'none'; you.style.transform = `translate(${hx}px, ${hy}px) translate(-50%, -100%)`;
   const now = performance.now();
   for (const f of floats) {
@@ -801,7 +895,8 @@ function camera(dt) {
   S.zoomTo = clamp(S.zoomTo, S.zMin, 2.2);
   S.zoom = Math.abs(S.zoomTo - S.zoom) < 0.002 ? S.zoomTo : S.zoom * Math.pow(S.zoomTo / S.zoom, Math.min(1, dt * 9));
   R.setZoom(S.zoom);
-  let tx = P.x + Math.cos(P.face) * 0.5 - SY * 0.9, ty = P.y + Math.sin(P.face) * 0.5 - CY * 0.9;
+  const lead = P.mounted ? 1.6 : 0.5, lift = 0.9 + P.h * 0.75;      // look ahead further at a gallop; look up when on high ground
+  let tx = P.x + Math.cos(P.face) * lead - SY * lift, ty = P.y + Math.sin(P.face) * lead - CY * lift;
   if ((W.bossState === 'fight' || W.bossState === 'dying') && W.boss) { tx = lerp(P.x, W.boss.x, 0.38) - SY * 1.6; ty = lerp(P.y, W.boss.y, 0.38) - CY * 1.6; }
   if (S.mode === 'title') { tx = W.B.start.x + 9 + Math.sin(S.t * 0.15) * 4; ty = W.B.start.y - 5 + Math.cos(S.t * 0.11) * 2; }
   // far back, centre on the page instead of the hero
@@ -832,8 +927,11 @@ function bind() {
     if (S.mode === 'title' && (e.code === 'Enter' || e.code === 'Space')) return startGame(!!readSave());
     if (e.code === 'KeyJ' || e.code === 'Space') { input.attack = true; input.held = true; }
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyK') input.dash = true;
+    if (e.code === 'KeyE') input.use = true;
+    if (e.code === 'KeyR') input.ride = true;
+    if (e.code === 'KeyF') input.fire = true;
     if (e.code === 'KeyM') toggleSound();
-    if (e.code === 'KeyZ') S.zoomTo = S.zoomTo < 0.5 ? 1.3 : S.zMin;
+    if (e.code === 'KeyZ') S.zoomTo = S.zoomTo < 0.5 ? 1.0 : S.zMin;
     if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
   });
   addEventListener('keyup', (e) => { keys.delete(e.code); if (e.code === 'KeyJ' || e.code === 'Space') input.held = false; });
@@ -864,13 +962,14 @@ function bind() {
   const btn = (id, down, upf) => { const b = $(id); b.addEventListener('pointerdown', (e) => { e.preventDefault(); audio.start(); b.classList.add('down'); down(); }); const u = () => { b.classList.remove('down'); upf && upf(); }; b.addEventListener('pointerup', u); b.addEventListener('pointercancel', u); b.addEventListener('pointerleave', u); };
   btn('bA', () => { input.attack = true; input.held = true; }, () => { input.held = false; });
   btn('bD', () => { input.dash = true; });
+  btn('bU', () => { input.use = true; }); btn('bR', () => { input.ride = true; }); btn('bF', () => { input.fire = true; });
   $('start').addEventListener('click', () => startGame(false));
   $('cont').addEventListener('click', () => startGame(true));
   $('snd').addEventListener('click', toggleSound);
   $('pz').addEventListener('click', togglePause);
   $('zin').addEventListener('click', () => zoomBy(1.5));
   $('zout').addEventListener('click', () => zoomBy(1 / 1.5));
-  $('zmap').addEventListener('click', () => { S.zoomTo = S.zoomTo < 0.5 ? 1.3 : S.zMin; });
+  $('zmap').addEventListener('click', () => { S.zoomTo = S.zoomTo < 0.5 ? 1.0 : S.zMin; });
   $('resume').addEventListener('click', togglePause);
   $('quit').addEventListener('click', () => location.reload());
   $('again').addEventListener('click', () => { clearSave(); location.reload(); });
@@ -887,8 +986,8 @@ function startGame(cont) {
   S.runT = 0; S.deaths = 0; S.mode = 'play';
   const sv = cont && readSave();
   if (sv) { applySave(sv); S.land = -1; enterLand(W.T.regAt(P.x, P.y)); }
-  else { clearSave(); S.land = -1; enterLand(0); after(8.5, () => say('Scroll to zoom. Press Z or MAP to see the whole world.', 3.4)); }
-  $('hint').textContent = 'WHEEL ZOOM · WASD MOVE · CLICK STRIKE · SHIFT DASH';
+  else { clearSave(); S.land = -1; enterLand(0); after(8.5, () => say('No walls out here. Go anywhere. R calls your horse, Z shows the whole world.', 4)); }
+  $('hint').textContent = 'WASD MOVE \u00b7 CLICK STRIKE \u00b7 SHIFT DASH \u00b7 R HORSE \u00b7 E USE \u00b7 F FIRE \u00b7 WHEEL ZOOM';
   setTimeout(() => { $('hint').textContent = ''; }, 30000);
 }
 
@@ -897,14 +996,14 @@ async function boot() {
     try { await Promise.all([document.fonts.load('500 20px "JetBrains Mono"'), document.fonts.load('800 20px "JetBrains Mono"')]); } catch (e) { /* fall back to system monospace */ }
     R = new Renderer($('game'));
     bind();
-    if (matchMedia('(pointer: coarse)').matches) { document.body.classList.add('touch'); $('keys').textContent = 'LEFT THUMB move · STRIKE · DASH · PINCH or + − zoom'; }
+    if (matchMedia('(pointer: coarse)').matches) { document.body.classList.add('touch'); $('keys').textContent = 'LEFT THUMB move \u00b7 STRIKE \u00b7 DASH \u00b7 USE \u00b7 HORSE \u00b7 FIRE \u00b7 PINCH zoom'; }
     loadWorld(); S.mode = 'title'; S.reveal = 0; S.revealTo = 1;
     if (readSave()) $('cont').style.display = ''; else $('start').textContent = 'BEGIN';
     $('loading').style.display = 'none'; $('start').style.visibility = 'visible';
     audio.pending = LANDS[0].music;
     requestAnimationFrame(frame);
     const q = new URLSearchParams(location.search);
-    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective };
+    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire };
   } catch (err) {
     console.error(err); $('err').style.display = 'flex'; $('title').classList.remove('on');
   }

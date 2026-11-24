@@ -1,8 +1,8 @@
 # UNWRITTEN
 
-An ASCII action game set in one small open world of five lands. Plays in the browser, no install.
+An ASCII action game in one open world of five lands. Plays in the browser, no install.
 
-Something is deleting the world one word at a time. You are the last Scribe: walk the lands in any order, find the letters, beat what guards them, and write the world back.
+Something is deleting the world one word at a time. You are the last Scribe. There are no walls: walk or ride anywhere, in any order, find the letters, beat what guards them, and write the world back.
 
 **Play:** https://tetriss22.github.io/unwritten/
 
@@ -13,23 +13,26 @@ Something is deleting the world one word at a time. You are the last Scribe: wal
 | Move | WASD or arrows | left thumb |
 | Strike (three-hit combo, third is a spin) | click, J or Space | STRIKE |
 | Dash (brief invulnerability) | Shift, K or right click | DASH |
+| Call your horse / get down | R | HORSE |
+| Climb a tower, climb down, talk | E | USE |
+| Light a campfire (checkpoint, heals you) | F | FIRE |
 | Zoom | mouse wheel, + and - | pinch, or the + and - buttons |
 | Whole-world map | Z, or the MAP button | MAP |
 | Sound / pause | M / Esc | buttons, top right |
 
-Striking a red shot sends it back. Progress is saved in the browser, so a reload offers CONTINUE.
+Striking a red shot sends it back. Striking from the saddle jumps you off swinging. Progress is saved in the browser, so a reload offers CONTINUE.
 
 ## The world
 
-Four lands sit around a hole in the middle of the page, joined by a ring road. Each land hides the letters of one word; writing the word opens the way to that land's lantern. Light all four and the road into the middle gets written.
+Four lands sit around a hole in the middle of the page. Roads join them, but you do not have to use them: meadows, forests, ponds and ruins are all open ground. Only the cut places stop you, a river, a lake, a wall of fire, a wall of ice, and each one is crossed by writing its word.
 
 1. **The Margin** (south-west, where you start): write BRIDGE to cross the river
-2. **The Drowned Shelves** (north-west): write STONE to raise a road out of the water
+2. **The Drowned Shelves** (north-west): write STONE to raise a road across the lake
 3. **Cinder Row** (north-east): write RAIN to put out the red ink
 4. **Whiteout Pass** (south-east): write FIRE to melt the wall
-5. **The Blank** (the middle): write END, then say it to the Editor
+5. **The Blank** (the middle): opens when four lanterns burn. Write END, then say it to the Editor
 
-A lit lantern makes its whole land brighter, which you can see from the map view.
+Towers can be climbed: nothing reaches you on high ground, and the camera pulls back so you can read the land. People who stayed behind will tell you what they know. A lit lantern makes its whole land brighter.
 
 ## How the picture is made
 

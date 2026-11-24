@@ -182,7 +182,8 @@ export const LANDS = [
 ];
 
 // ---------- the map: named places [x, y, radius, land]
-export const SIZE = [128, 92];
+const K = 1.4;                       // the map below is drawn on a 128 x 92 sheet and stretched: more open land between places
+export const SIZE = [179, 129];
 const PLACES = {
   // I  the Margin (south-west) and the south road
   M0: [10, 84, 3, 0], M1: [18, 82, 2.5, 0], M2: [26, 76, 3, 0], M3: [16, 72, 2.8, 0], M4: [30, 86, 2.6, 0], M5: [36, 70, 3, 0], M6: [24, 64, 2.8, 0],
@@ -201,7 +202,7 @@ const PLACES = {
   P0: [103, 59, 2.8, 3], P1: [112, 67, 3, 3], P2: [96, 68, 3.3, 3], P3: [118, 79, 3, 3], P4: [104, 81, 3, 3], P5: [88, 75, 3, 3],
   PgA: [113.5, 62.2, 2.2, 3], PgB: [120, 56.6, 2.2, 3], PL: [121.6, 51.6, 3, 3], S2: [84, 82, 2.2, 3],
   // V  the Blank (the hole in the middle of the page)
-  sB: [64, 67, 2.2, 4], B1: [55, 62, 2.7, 4], B2: [73, 62, 2.7, 4], B3: [64, 58.5, 2.9, 4], eA: [64, 54, 2, 4], AR: [64, 41.5, 7.2, 4],
+  sB: [64, 67, 2.2, 4], B1: [56.5, 62, 2.7, 4], B2: [71.5, 62, 2.7, 4], B3: [64, 58.5, 2.9, 4], eA: [64, 54, 2, 4], AR: [64, 41.5, 7.2, 4],
 };
 const ROADS = [
   'M0-M1', 'M1-M2', 'M1-M3', 'M2-M3', 'M2-M4', 'M2-M5', 'M2-M6', 'M5-M6', 'M3-MgA', 'MgB-ML', 'M4-S1', 'M5-S1', 'S1-XS', 'XS-sA', 'M6-W1', 'W1-W2',
@@ -219,15 +220,28 @@ const GATES = [
   { id: 'seal', a: 'sA', b: 'sB', land: 4, need: 'lanterns', text: 'BRIDGE STONE RAIN FIRE ' },
   { id: 'w4', a: 'eA', b: 'AR', land: 4, need: 'word', text: ' THE END' },
 ];
-const ring = (cx, cy, r, n) => Array.from({ length: n + 1 }, (_, i) => [cx + Math.cos(i / n * 6.2832) * r, cy + Math.sin(i / n * 6.2832) * r]);
-// rivers, walls and voids: strips of impassable ground [land, half-width, points]
+const arc = (cx, cy, r, a0, a1, n) => Array.from({ length: n + 1 }, (_, i) => { const a = (a0 + (a1 - a0) * i / n) * Math.PI / 180; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]; });
+// Rivers, walls and voids: the only ground you cannot cross. Each one closes off the place its word opens. [land, half-width, points]
 const STRIPS = [
-  [0, 1.9, [[-1, 73.4], [8.75, 66.75], [16, 61.7], [20, 56], [19.4, 49], [15, 42.5], [9, 38]]],
-  [1, 1.7, [[36, 7.5], [37, 14.25], [37.5, 18]]],
-  [2, 1.8, [[117.6, -1], [116.4, 14], [116.6, 28], [117.4, 39], [119, 45.5]]],
-  [3, 1.7, [[109.6, 51.6], [116.75, 59.4], [123, 66.5], [129, 71.5]]],
-  [4, 1.3, ring(64, 41.5, 9.7, 28)],
-  [4, 1.4, [[55, 71.4], [64, 71], [73, 71.4]]],
+  [0, 1.9, [[-3, 73.4], [8.75, 66.75], [16, 61.7], [20, 56], [19.4, 49], [15, 42.5], [9, 38], [-3, 35]]],
+  [1, 1.4, arc(44, 11.3, 7.6, 0, 360, 26)],
+  [2, 1.8, [[117.6, -3], [116.4, 14], [116.6, 28], [117.4, 39], [119, 45.5], [131, 46.5]]],
+  [3, 1.7, [[119, 45.5], [112, 47.5], [109.6, 51.6], [116.75, 59.4], [123, 66.5], [131, 71.5]]],
+  [4, 1.3, arc(64, 41.5, 9.7, 0, 360, 28)],
+  [4, 1.4, arc(64, 60.5, 12.5, -68, 248, 30)],
+];
+// people who stayed: [place, dx, dy, name, what they say]
+const PEOPLE = [
+  ['M0', 2.0, -1.4, 'Old Reader', 'The Editor cut our bridge. Six letters, and the river gives it back.'],
+  ['M5', 1.8, 1.2, 'Miller', 'Press R and whistle. The paper horse still knows every road.'],
+  ['XS', -2.0, 1.2, 'Signwriter', 'Four lands, four lanterns. Light them all and the hole in the middle opens.'],
+  ['W1', 1.4, 0.8, 'Ferryman', 'No walls out here. Walk anywhere. Only the cut places stop you.'],
+  ['D0', 1.8, 1.0, 'Librarian', 'Stand by a tower and press E. From the top you can read the whole page.'],
+  ['N2', 1.6, 1.2, 'Pilgrim', 'Look south. That hole in the page was a city.'],
+  ['C0', 1.6, 1.2, 'Ash-sweeper', 'Cold? Press F. A fire remembers where you stood, and mends you.'],
+  ['E1', 1.4, 0.8, 'Carter', 'Red ink ahead. Where a ring appears on the ground, do not be standing in it.'],
+  ['P0', 1.8, 1.0, 'Hermit', 'The wall is ice. Ice is only water that forgot the word FIRE.'],
+  ['sA', 1.3, 0.6, 'Gatekeeper', 'No road north yet. It gets written when four lanterns burn.'],
 ];
 const LETTERS = [
   [0, 'M1', []], [0, 'M2', ['blot']], [0, 'M3', ['blot', 'blot']], [0, 'M4', ['blot', 'blot']], [0, 'M5', ['blot', 'blot', 'blot']], [0, 'M6', ['blot', 'blot', 'scratch']],
@@ -247,10 +261,11 @@ export const TEXTS = [...GATES.map(g => g.text), 'the world was written and then
 
 export function buildWorld() {
   const [wu, hu] = SIZE, T = new Terrain(wu, hu), R = rng(90210);
-  const nodes = Object.entries(PLACES).map(([id, [x, y, r, land, field]]) => ({ id, x, y, r, land, field: !!field }));
+  const nodes = Object.entries(PLACES).map(([id, [x, y, r, land, field]]) => ({ id, x: x * K, y: y * K, r, land, field: !!field }));
   const N = Object.fromEntries(nodes.map(n => [n.id, n]));
   const edges = ROADS.map(s => { const [a, b] = s.split('-').map(k => N[k]); return { a, b, w: Math.min(LANDS[a.land].edgeW, LANDS[b.land].edgeW) }; });
-  const strips = STRIPS.map(([land, hw, pts]) => ({ land, hw, pts }));
+  const strips = STRIPS.map(([land, hw, pts]) => ({ land, hw, pts: pts.map(([x, y]) => [x * K, y * K]) }));
+  const road = new Uint8Array(T.w * T.h);
 
   // spatial buckets so each cell only looks at what is near it
   const BS = 4, bw = Math.ceil(wu / BS), bh = Math.ceil(hu / BS), REACH = 8.5;
@@ -297,8 +312,17 @@ export function buildWorld() {
     for (const g of gates) if (segDist(ux, uy, g.A.x, g.A.y, g.B.x, g.B.y) < 1.0 && (wd > -0.3 || st || stripAt(ux, uy, 0.6))) g.cells.push([cx, cy, Math.hypot(ux - g.A.x, uy - g.A.y)]);
     if (st) { paint(T, cx, cy, LANDS[st.land].mats.barrier, LANDS[st.land].seed, st.land); continue; }
     const d = wd + (fbm(ux * 0.8, uy * 0.8, seed) - 0.5) * 1.1 * L.rough;
-    if (d >= 0) { paint(T, cx, cy, m.outside, seed, land); continue; }
     T.solid[i] = 0;
+    if (d >= 0) {            // the wilds: open ground, walk anywhere
+      const far = wd > 2.2, pond = far && land !== 2 && land !== 4 && fbm(ux * 0.085, uy * 0.085, 300 + land) > 0.69;
+      if (land === 1 || (pond && land === 0)) { T.put(cx, cy, '~', land * 16 + (land === 1 ? 7 : 5), 0.9, 1); T.tag[i] = 3; }
+      else if (pond && land === 3) { paint(T, cx, cy, m.ice, seed, land); T.tag[i] = 2; }
+      else if (far && land === 0 && fbm(ux * 0.12, uy * 0.12, 400) > 0.7) paint(T, cx, cy, m.path, seed, land);
+      else if (far && land === 0 && fbm(ux * 0.1, uy * 0.1, 450) > 0.68) paint(T, cx, cy, m.field, seed, land);
+      else paint(T, cx, cy, m.outside, seed, land);
+      continue;
+    }
+    road[i] = 1;
     const pd = pathD(ux, uy);
     if (pd < 0.42) paint(T, cx, cy, m.path, seed, land);
     else if (d > -0.5) paint(T, cx, cy, m.edge, seed, land);
@@ -317,7 +341,7 @@ export function buildWorld() {
   for (const g of gates) g.cells.sort((a, b) => a[2] - b[2]);
 
   // mark walkable cells (high bit of the kind byte) so the map view can lift roads and places out of the dark
-  const markWalk = () => { for (let i = 0; i < T.solid.length; i++) if (!T.solid[i]) T.data[i * 4 + 3] |= 128; };
+  const markWalk = () => { for (let i = 0; i < road.length; i++) if (road[i]) T.data[i * 4 + 3] |= 128; };
   markWalk();
 
   // ---------- scenery
@@ -411,14 +435,45 @@ export function buildWorld() {
     }
   }
 
+  // lookout towers you can climb, one by each land's heart and one at the crossroads
+  for (const id of ['M2', 'D3', 'C2', 'P2', 'XS', 'N2']) {
+    const n = N[id];
+    for (let k = 0; k < 8; k++) {
+      const a = backA + (k % 2 ? 1 : -1) * (0.3 + k * 0.25), x = n.x + Math.cos(a) * (n.r + 3.0), y = n.y + Math.sin(a) * (n.r + 3.0);
+      if (walk(x, y) < 1.5 || stripAt(x, y, 1.6) || sites.some(q => Math.hypot(q.x - x, q.y - y) < 3.4)) continue;
+      sites.push({ x, y }); props.push({ type: n.land === 3 ? 'watchtower' : 'tower', x, y, s: 1.15, rot: Math.atan2(n.x - x, n.y - y), v: 0.6 }); break;
+    }
+  }
+  // the wilds: forests where a slow noise is high, scattered stones and bushes elsewhere
+  for (let gy = 1; gy < hu - 1; gy += 1.9) for (let gx = 1; gx < wu - 1; gx += 1.9) {
+    const x = gx + (R() - 0.5) * 1.5, y = gy + (R() - 0.5) * 1.5;
+    if (walk(x, y) < 4.8 || stripAt(x, y, 0.9) || T.tagAt(x, y) === 3) continue;
+    const land = T.regAt(x, y), P = LANDS[land].props, forest = fbm(x * 0.065, y * 0.065, 500) > 0.52;
+    if (R() > (forest ? 0.8 : 0.07) * (land === 1 ? 0.35 : 1) || gates.some(g => segDist(x, y, g.A.x, g.A.y, g.B.x, g.B.y) < 2.6)) continue;
+    if (sites.some(q => Math.hypot(q.x - x, q.y - y) < 3) || Math.hypot(x - AR.x, y - AR.y) < 16) continue;
+    props.push({ type: forest ? pick(P.border) : pick(P.low.concat(P.inner)), x, y, s: 0.8 + R() * 0.55, rot: R() * 6.28, v: R() });
+  }
+  // what you cannot walk through
+  const HARD = { tree: 0.32, cypress: 0.32, pine: 0.34, deadtree: 0.28, tower: 1.0, watchtower: 0.95, windmill: 1.3, burnt: 1.5, well: 0.75, crates: 0.7, cart: 0.85, hay: 0.55, boulder: 0.7, column: 0.4, shelf: 0.6, wall: 0.7, stone: 0.3 };
+  const towers = [];
+  for (const p of props) {
+    const r = HARD[p.type];
+    if (r) T.solidCircle(p.x, p.y, r * p.s);
+    else if (p.type === 'house' || p.type === 'cabin') for (const o of [-0.8, 0.8]) T.solidCircle(p.x + Math.cos(p.rot) * o * p.s, p.y - Math.sin(p.rot) * o * p.s, 1.2 * p.s);
+    else if (p.type === 'ruinwall') for (const o of [-1.9, -0.63, 0.63, 1.9]) T.solidCircle(p.x + Math.cos(p.rot) * o * p.s, p.y - Math.sin(p.rot) * o * p.s, 0.55 * p.s);
+    if (p.type === 'tower') towers.push({ x: p.x, y: p.y, top: (3.8 + p.v * 1.4 + 0.3) * p.s, rad: 0.72 * p.s, base: 1.0 * p.s });
+    if (p.type === 'watchtower') towers.push({ x: p.x, y: p.y, top: (3.8 + p.v * 1.4 + 0.1) * p.s, rad: 0.6 * p.s, base: 0.95 * p.s });
+  }
+  const npcs = PEOPLE.map(([id, dx, dy, name, line], k) => ({ x: N[id].x + dx, y: N[id].y + dy, name, line, hue: k }));
+
   const letters = LETTERS.map(([land, at, guards], k) => ({ land, x: N[at].x, y: N[at].y, guards, id: k }));
   LANDS.forEach((L, li) => letters.filter(l => l.land === li).forEach((l, k) => { l.ch = L.word[k]; }));
   const goals = [N.ML, N.DL, N.CL, N.PL, N.AR];
   const core = { 0: 'M', 1: 'D', 2: 'C', 3: 'P', 4: 'B' };
   const centers = LANDS.map((_, li) => { const ns = nodes.filter(n => n.land === li && n.id[0] === core[li] && n.id.length === 2); return { x: ns.reduce((s, n) => s + n.x, 0) / ns.length, y: ns.reduce((s, n) => s + n.y, 0) / ns.length }; });
   return {
-    T, N, nodes, edges, gates, props, lamps, letters, hazard, goals, centers, walk,
-    start: N.M0, roam: ROAM.map(([x, y, type]) => ({ x, y, type })), hearts: HEARTS.map(([x, y]) => ({ x, y })),
+    T, N, nodes, edges, gates, props, lamps, letters, hazard, goals, centers, walk, towers, npcs,
+    start: N.M0, roam: ROAM.map(([x, y, type]) => ({ x: x * K, y: y * K, type })), hearts: HEARTS.map(([x, y]) => ({ x: x * K, y: y * K })),
     paintGate(g, cx, cy) { const L = LANDS[g.land]; paint(T, cx, cy, L.mats.bridge, L.seed, g.land, g.tid); const i = cy * T.w + cx; T.solid[i] = 0; T.tag[i] = 0; T.data[i * 4 + 3] |= 128; },
     coolHazard() { const L = LANDS[2]; for (const [cx, cy] of hazard) { paint(T, cx, cy, L.mats.cooled, L.seed, 2); T.tag[cy * T.w + cx] = 0; T.data[(cy * T.w + cx) * 4 + 3] |= 128; } },
     // a lit lantern makes its whole land easier to read
