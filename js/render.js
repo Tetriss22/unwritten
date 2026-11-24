@@ -3,7 +3,7 @@
 // (shadows, water reflections, the scene itself) are redrawn as glyphs; the ground is read from a
 // terrain texture through the same camera, so the glyph grid stays glued to the world while it scrolls.
 import * as THREE from '../lib/three.module.min.js';
-import { CPU, YAW, PITCH } from './terrain.js';
+import { CPU, YAW, PITCH, STONE, ASH, SNOW } from './terrain.js';
 import { shared, makeMeshAtlas, gmat } from './glyph.js';
 export { CPU, YAW, PITCH };
 
@@ -38,6 +38,7 @@ function makeAtlas(gw, gh, weight) {
   return t;
 }
 
+const codes = (str) => [...str].map(c => c.charCodeAt(0) - 32).join(',');
 const VERT = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
 const f = (n) => n.toFixed(6);
 
@@ -45,7 +46,8 @@ const FRAG = `
 precision highp float;
 uniform sampler2D tRefl, tShadow, tTerrain, tText, tAtlasF, tAtlasC;
 uniform vec2 uRes, uOrigin, uFine, uObj0, uObjSize, uTerSize, uPlayer;
-uniform float uU, uG, uTime, uSeed, uMap;
+uniform float uU, uG, uTime, uSeed, uMap, uFineGrass;
+uniform vec4 uRing[6];
 uniform vec4 uScar[4];
 uniform vec3 uPal[80];
 uniform float uTextLen[8];
@@ -61,6 +63,11 @@ const int RAMP[${RAMP.length}] = int[](${[...RAMP].map(c => c.charCodeAt(0) - 32
 const vec2 INVX = vec2(${f(CY)}, ${f(SY / SINP)});
 const vec2 INVZ = vec2(${f(-SY)}, ${f(CY / SINP)});
 const float CPUF = ${f(CPU)};
+const int STN[${STONE.length}] = int[](${codes(STONE)});
+const int ASHR[${ASH.length}] = int[](${codes(ASH)});
+const int SNWR[${SNOW.length}] = int[](${codes(SNOW)});
+const vec2 PXV = vec2(${f(CY)}, ${f(-SY)});
+vec3 shadeCol(vec3 col, float bri, vec3 L){ return col * bri * min(L, vec3(1.3)) + max(L - 1.0, vec3(0.0)) * bri * 0.45; }
 
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float glyph(sampler2D atlas, float code, vec2 g){
@@ -95,15 +102,16 @@ void main(){
   int rows = int(uObjSize.y);
 
   // ---- ground glyph cell and the spot of world under it
-  vec2 gc = floor(wp / uG), cuv = fract(wp / uG);
-  vec2 gpx = (gc + 0.5) * uG;
+  vec2 GS = vec2(uG * 0.62, uG);       // a ground letter's cell: as narrow as the letter, so text runs dense
+  vec2 gc = floor(wp / GS), cuv = fract(wp / GS);
+  vec2 gpx = (gc + 0.5) * GS;
   vec2 w = ground(gpx);
   float hc = hash(gc + uSeed), hc2 = hash(gc + uSeed + 17.3);
   vec4 t = terrain(w);
   float cellW = uG / uU;
   if (cellW > 0.22 && t.a < 0.5) {    // far away: if any part of the cell is road, show road
     for (int k = 0; k < 4; k++) {
-      vec4 t2 = terrain(ground(gpx + uG * vec2(k == 0 || k == 2 ? -0.3 : 0.3, k < 2 ? -0.3 : 0.3)));
+      vec4 t2 = terrain(ground(gpx + GS * vec2(k == 0 || k == 2 ? -0.3 : 0.3, k < 2 ? -0.3 : 0.3)));
       if (t2.a >= 0.5) { t = t2; break; }
     }
   }
@@ -124,12 +132,21 @@ void main(){
     code = wv > 0.55 ? ch(126) : (wv > -0.15 ? ch(45) : (hc > 0.6 ? ch(95) : ch(32)));
     bri *= 0.6 + 0.45 * (wv * 0.5 + 0.5);
     if (wv > 0.86) col = uPal[lp + 6];
-  } else if (kind == 2 || kind == 8) {     // grass and standing crops lean with the gusts
+  } else if ((kind == 2 || kind == 8) && uFineGrass > 0.5) {   // soil under the blades; the grass itself is drawn below
+    code = ch(44 + int(hc * 3.0)); bri *= 0.28;
+  } else if (kind == 2 || kind == 8) {     // far away: grass as single letters leaning with the gusts
     float lean = gust + (hc - 0.5) * (kind == 8 ? 0.5 : 1.0);
     if (kind == 8) { code = lean > 0.4 ? ch(47) : (lean < -0.65 ? ch(92) : (hc2 > 0.5 ? ch(124) : ch(33))); bri *= 0.78 + 0.5 * smoothstep(0.1, 1.0, gust); }
     else { if (lean > 0.7) code = ch(47); else if (lean < -0.85) code = ch(92); bri *= 0.9 + 0.3 * smoothstep(0.2, 1.0, gust); }
     float pd = length(w - uPlayer);
     if (pd < 0.8) { code = w.x < uPlayer.x ? ch(92) : ch(47); if (pd < 0.45) code = ch(95); bri *= 1.2; }
+  } else if (kind == 9) {     // stone text: heavier letters where the stone is brighter
+    code = float(STN[int(clamp(code / 255.0 * ${f(STONE.length - 5)} + hc * 5.0, 0.0, ${f(STONE.length - 1)}))]);
+  } else if (kind == 10) {    // ash
+    code = float(ASHR[int(clamp(code / 255.0 * ${f(ASH.length - 3)} + hc * 3.0, 0.0, ${f(ASH.length - 1)}))]);
+  } else if (kind == 11) {    // snow, with glitter
+    code = float(SNWR[int(clamp(code / 255.0 * ${f(SNOW.length - 2)} + hc * 2.0, 0.0, ${f(SNOW.length - 1)}))]);
+    if (fract(hc + uTime * 0.21 + hc2) > 0.985) { code = ch(42); bri = 1.6; col = uPal[lp + 13]; }
   } else if (kind == 3) {     // lava / embers
     float fl = sin(uTime * 2.6 + hc * 6.28 + w.x * 3.2) * 0.5 + 0.5;
     code = fl > 0.7 ? ch(94) : (fl > 0.35 ? ch(126) : ch(42));
@@ -150,25 +167,33 @@ void main(){
   if (uMap > 0.3 && code == 0.0 && t.g > 0.0) code = walkable ? ch(43) : ch(46);
 
   vec3 L = lightAt(w);
-  vec3 pulse = vec3(0.0);
+  vec3 pulse = vec3(0.0); float fx = 0.0;
   for (int i = 0; i < ${MAX_PULSE}; i++) {
     vec4 p = uPulse[i];
     if (p.w <= 0.0) continue;
     float band = 1.0 - smoothstep(0.0, 0.28, abs(length(w - p.xy) - p.z));
-    if (band > 0.0) { pulse += uPulseCol[i] * band * p.w; if (band > 0.5 && hc > 0.3) code = hc2 > 0.5 ? ch(42) : ch(43); }
+    if (band > 0.0) { pulse += uPulseCol[i] * band * p.w; if (band > 0.5 && hc > 0.3) { code = hc2 > 0.5 ? ch(42) : ch(43); fx = 1.0; } }
   }
   for (int i = 0; i < 4; i++) {   // the Editor's strike-through
     vec4 l = uLine[i];
     if (l.w <= 0.0) continue;
     float dl = l.y < 0.5 ? abs(w.y - l.x) : abs(w.x - l.x);
-    if (dl < l.z) { pulse += mix(vec3(1.0, 0.12, 0.22), vec3(1.0), clamp(l.w - 1.0, 0.0, 1.0)) * min(l.w, 1.6) * (0.45 + 0.55 * hc); code = l.y < 0.5 ? ch(61) : ch(35); }
+    if (dl < l.z) { pulse += mix(vec3(1.0, 0.12, 0.22), vec3(1.0), clamp(l.w - 1.0, 0.0, 1.0)) * min(l.w, 1.6) * (0.45 + 0.55 * hc); code = l.y < 0.5 ? ch(61) : ch(35); fx = 1.0; }
   }
   for (int i = 0; i < 4; i++) {   // the quill leaves a mark where it cut
     vec4 sc = uScar[i];
     if (sc.w <= 0.0) continue;
     vec2 dv = w - sc.xy; float dr = length(dv);
     float da = abs(mod(atan(dv.y, dv.x) - sc.z + 3.14159, 6.28318) - 3.14159);
-    if (dr > 0.7 && dr < 2.1 && (da < 1.15 || sc.z > 50.0) && hc > 0.25) { pulse += vec3(1.0, 0.45, 0.72) * sc.w * (0.5 + 0.5 * hc2); code = hc2 > 0.6 ? ch(120) : (hc2 > 0.3 ? ch(61) : ch(126)); }
+    if (dr > 0.7 && dr < 2.1 && (da < 1.15 || sc.z > 50.0) && hc > 0.25) { pulse += vec3(1.0, 0.45, 0.72) * sc.w * (0.5 + 0.5 * hc2); code = hc2 > 0.6 ? ch(120) : (hc2 > 0.3 ? ch(61) : ch(126)); fx = 1.0; }
+  }
+  for (int i = 0; i < 6; i++) {   // where an attack is about to land: a dotted ring
+    vec4 rg = uRing[i];
+    if (rg.w <= 0.0) continue;
+    vec2 dv = w - rg.xy; float d = length(dv);
+    if (abs(d - rg.z) < 0.17) {
+      if (fract(atan(dv.y, dv.x) * max(1.0, rg.z) * 1.9 + uTime * 0.5) > 0.3) { pulse += vec3(1.0, 0.55, 0.15) * rg.w; code = ch(111); fx = 1.0; }
+    } else if (d < rg.z) pulse += vec3(0.5, 0.14, 0.04) * rg.w * 0.3 * hc;
   }
   float erased = 0.0;
   for (int i = 0; i < ${MAX_ERASE}; i++) {
@@ -179,15 +204,45 @@ void main(){
   // shadows thrown by everything standing on the page
   ivec2 si = ivec2(floor(gpx / uFine) - uObj0);
   float shade = texelFetch(tShadow, ivec2(si.x, rows - 1 - si.y), 0).a;
-  vec3 lit = col * bri * L * (1.0 - 0.62 * shade) + pulse;
+  vec3 lit = shadeCol(col, bri, L) * (1.0 - 0.62 * shade) + pulse;
   float lum = max(lit.r, max(lit.g, lit.b));
   if (kind != 6 && code != 0.0 && pulse == vec3(0.0)) {
     if (lum < 0.03) code = 0.0;
     else if (lum < 0.07 && hc > 0.45) code = ch(46);
   }
-  vec2 g = (cuv - vec2(0.12, 0.03)) / vec2(0.76, 0.94);
+  vec2 g = (cuv - vec2(0.03, 0.03)) / vec2(0.94, 0.94);
   float gm = glyph(tAtlasC, code, g) * (1.0 - erased);
   vec3 outc = uBg + lit * gm;
+
+  // ---- grass: a finer, staggered grid of blades on top of the ground, each leaning with the wind
+  if (uFineGrass > 0.5) {
+    vec2 gs = uG * vec2(0.4, 0.6);
+    vec2 fp = wp / gs; float frow = floor(fp.y), stag = mod(frow, 2.0) * 0.5;
+    fp.x += stag;
+    vec2 fcl = floor(fp), fu = fract(fp);
+    vec2 fpx = vec2((fcl.x + 0.5 - stag) * gs.x, (fcl.y + 0.5) * gs.y);
+    vec2 fw2 = ground(fpx);
+    vec4 ft = terrain(fw2);
+    int fk = int(ft.a * 255.0 + 0.5); if (fk >= 128) fk -= 128;
+    float h1 = hash(fcl + 3.7), h2 = hash(fcl + 91.3);
+    if ((fk == 2 || fk == 8) && h1 > 0.07) {
+      int fpal = int(ft.g * 255.0 + 0.5), flp = (fpal / 16) * 16;
+      float gf = sin(dot(fw2, vec2(0.52, 0.3)) - uTime * 1.7 + sin(fw2.y * 0.31 + fw2.x * 0.11 + uTime * 0.29) * 1.5);
+      float lean = gf + (h1 - 0.5) * 1.3;
+      float gcode = lean > 0.55 ? ch(47) : (lean < -0.7 ? ch(92) : (h2 > 0.62 ? ch(124) : (h2 > 0.3 ? ch(33) : ch(39))));
+      vec3 gcol = uPal[fpal];
+      float gb = ft.b * 1.6 * (0.6 + 0.6 * h2) * (0.85 + 0.4 * smoothstep(0.1, 1.0, gf)) * (fk == 8 ? 1.1 : 1.0);
+      if (fk == 2 && h1 > 0.986) { gcode = ch(42); gcol = uPal[flp + (h2 > 0.5 ? 14 : 15)]; gb = 1.35; }
+      float pd = length(fw2 - uPlayer);
+      if (pd < 0.95) { gcode = fpx.x < dot(uPlayer, PXV) * uU ? ch(92) : ch(47); if (pd < 0.5) { gcode = ch(95); gb *= 0.7; } }
+      ivec2 s2 = ivec2(floor(fpx / uFine) - uObj0);
+      float sh2 = texelFetch(tShadow, ivec2(s2.x, rows - 1 - s2.y), 0).a;
+      vec3 gl = shadeCol(gcol, gb, lightAt(fw2)) * (1.0 - 0.62 * sh2) + pulse * 0.8;
+      float gm2 = glyph(tAtlasC, gcode, (fu - 0.5) / 1.12 + 0.5) * (1.0 - erased);
+      outc = mix(outc, uBg + gl, gm2);
+    }
+    if (fx > 0.5) outc = mix(outc, uBg + pulse, gm * clamp(max(pulse.r, max(pulse.g, pulse.b)) * 1.5, 0.0, 1.0));
+  }
 
   // ---- reflections of standing things in water
   if (kind == 1) {
@@ -264,7 +319,8 @@ export class Renderer {
       tRefl: U(null), tShadow: U(null), tTerrain: U(null), tText: U(null), tAtlasF: U(null), tAtlasC: U(null),
       uRes: U(new THREE.Vector2()), uOrigin: U(new THREE.Vector2()), uFine: U(new THREE.Vector2()),
       uObj0: U(new THREE.Vector2()), uObjSize: U(new THREE.Vector2()), uTerSize: U(new THREE.Vector2()), uPlayer: U(new THREE.Vector2()),
-      uU: U(1), uG: U(1), uTime: U(0), uReveal: U(1), uFlash: U(0), uWeatherAmt: U(0), uDark: U(0), uSeed: U(0), uMap: U(0),
+      uU: U(1), uG: U(1), uTime: U(0), uReveal: U(1), uFlash: U(0), uWeatherAmt: U(0), uDark: U(0), uSeed: U(0), uMap: U(0), uFineGrass: U(1),
+      uRing: U(Array.from({ length: 6 }, () => new THREE.Vector4())),
       uWeather: U(0),
       uScar: U(Array.from({ length: 4 }, () => new THREE.Vector4())),
       uPal: U(Array.from({ length: 80 }, () => new THREE.Vector3(1, 1, 1))),
@@ -298,13 +354,13 @@ export class Renderer {
     this.canvas.style.width = innerWidth + 'px'; this.canvas.style.height = innerHeight + 'px';
     this.U0 = Math.max(40, Math.min(W / 7.4, H / 6.6));
     this.fw = Math.max(5.2, this.U0 / 23); this.fh = this.fw * 1.5;       // weather glyphs, and the grain of the shadow and reflection buffers
-    this.G0 = this.fw * 2.1;                               // ground glyphs at zoom 1
+    this.G0 = this.fw * 3.2;                               // ground glyphs at zoom 1: about a dozen rows per hero
     this.cols = Math.ceil(W / this.fw) + 2; this.rows = Math.ceil(H / this.fh) + 2;
     const opts = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true, type: THREE.UnsignedByteType };
     for (const k of ['rtRefl', 'rtShadow']) { if (this[k]) this[k].dispose(); this[k] = new THREE.WebGLRenderTarget(this.cols, this.rows, opts); }
     if (this.atlasF) { this.atlasF.dispose(); this.atlasC.dispose(); }
     this.atlasF = makeAtlas(Math.max(6, Math.round(this.fw * 2)), Math.max(9, Math.round(this.fh * 2)), 800);
-    this.atlasC = makeAtlas(Math.max(8, Math.round(this.G0 * 0.76 * 2.4)), Math.max(12, Math.round(this.G0 * 0.94 * 2.4)), 800);
+    this.atlasC = makeAtlas(Math.max(8, Math.round(this.G0 * 0.62 * 2.2)), Math.max(12, Math.round(this.G0 * 2.2)), 800);
     const u = this.u;
     u.tRefl.value = this.rtRefl.texture; u.tShadow.value = this.rtShadow.texture;
     u.tAtlasF.value = this.atlasF; u.tAtlasC.value = this.atlasC;
@@ -348,7 +404,7 @@ export class Renderer {
   render(cx, cy, time, shakeX = 0, shakeY = 0) {
     const u = this.u, U = this.U, [scx, scy] = toPlane(cx, cy);
     const ox = this.ox = Math.round(scx * U - this.W / 2 + shakeX), oy = this.oy = Math.round(scy * U - this.H / 2 + shakeY);
-    u.uOrigin.value.set(ox, oy); u.uTime.value = time; u.uU.value = U; u.uG.value = this.G; u.uSeed.value = this.step * 7.13;
+    u.uOrigin.value.set(ox, oy); u.uTime.value = time; u.uU.value = U; u.uG.value = this.G; u.uFineGrass.value = this.G * 0.4 >= 4.2 ? 1 : 0; u.uSeed.value = this.step * 7.13;
     const i0 = Math.floor(ox / this.fw), j0 = Math.floor(oy / this.fh);
     u.uObj0.value.set(i0, j0);
     const cam = this.cam;

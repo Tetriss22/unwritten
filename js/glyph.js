@@ -25,14 +25,14 @@ export function makeMeshAtlas(font) {
 }
 
 // what each kind of surface is written in: [symbols, letters per world unit, sway in the wind]
-export const KINDS = {
-  coat: ['NZSW#MHEzs=:', 11, 0], cape: ['WMNHKXV', 10, 0], skin: ['oOeac', 12, 0], dark: ['zs:;=x', 11, 0], leather: ['%&8B', 11, 0],
-  scarf: ['~=S$~', 11, 0], quill: ['|/!I1', 12, 0], gold: ['#@O0', 10, 0], slash: ['/-\\~=', 6, 0], xray: ['.:', 8, 0],
-  ink: ['@&%8$#', 9, 0], ink2: ['xX*#', 9, 0], eye: ['O@0', 9, 0], boss: ['#@&%$?!', 5, 0],
-  wall: ['H#N[]=IH', 4.4, 0], plaster: ['H[]#|I', 4.4, 0], roof: ['=^=/\\A', 4.8, 0], window: ['#H8@', 6.5, 0], door: ['|[]I', 5.5, 0],
-  wood: ['|=I!l', 6.5, 0], stone: ['O0#o%Q', 5.2, 0], brick: ['[]=#', 4.6, 0], metal: ['!i|:', 8, 0], lamp: ['*@#', 8, 0],
-  leaf: ['&%@oO8', 5.4, 1], needle: ['A^M/\\', 5.2, 0.7], trunk: ['|I!l1', 6, 0], reed: ['|!/l', 9, 1.6], hay: ['~=%/', 5.6, 0.5],
-  snow: ['*.+:\'', 5.2, 0], ice: ['/\\|V<>', 5, 0], fire: ['^*~W', 6, 0], book: ['=|#I', 7, 0], voidstone: ['?!_.-:', 5, 0], chunk: ['*+x#', 4, 0],
+export const KINDS = {   // symbols run from light to heavy: the lit side of a thing is written in heavier letters
+  coat: ['.:=zsSZNWM#', 13, 0], cape: [':=xvVKXNHWM', 12, 0], skin: ['.:oceaO', 13, 0], dark: ['.:;=xzs', 12, 0], leather: [':=%&8B', 12, 0],
+  scarf: ['~=S$~', 12, 0], quill: ['|/!I1', 13, 0], gold: ['#@O0', 11, 0], slash: ['/-\\~=', 6, 0], xray: ['.:', 9, 0],
+  ink: ['.:x%&8$#@', 10, 0], ink2: ['.:xX*#', 10, 0], eye: ['O@0', 10, 0], boss: ['.:?!$%&@#', 6.5, 0],
+  wall: ['.:=I[]HN#', 6.5, 0], roof: ['.-=^/\\A', 6.5, 0], window: ['#H8@', 7, 0], door: [':|[]I', 7, 0],
+  wood: ['.:|!lI=', 8, 0], stone: ['.:o0O%Q#', 7, 0], brick: ['.:=[]#', 6.5, 0], metal: ['.:!i|', 9, 0], lamp: ['*@#', 9, 0],
+  leaf: ['.:o%&8@', 7.5, 1], needle: ['.^/\\AM', 7, 0.7], trunk: ['.:!|lI1', 8, 0], reed: ['|!/l', 9, 1.6], hay: ['.~=%/', 7, 0.5],
+  snow: [".':*+", 7, 0], ice: ['.:/\\|V<>', 7, 0], fire: ['^*~W', 7, 0], book: ['=|#I', 8, 0], voidstone: ['.:-_?!', 6.5, 0], chunk: ['*+x#', 4, 0],
 };
 
 const VERT_HEAD = `
@@ -52,7 +52,7 @@ if (uSway > 0.0) {
 `;
 const FRAG_HEAD = `
 varying vec3 vGp; varying vec3 vGn;
-uniform sampler2D tGlyph; uniform float uSet[12]; uniform float uSetLen; uniform float uDens; uniform float uSeed;
+uniform sampler2D tGlyph; uniform float uSet[12]; uniform float uSetLen; uniform float uDens; uniform float uSeed; uniform float uShade;
 `;
 const FRAG_BODY = `
 {
@@ -61,10 +61,14 @@ const FRAG_BODY = `
   vec2 gq = gp * uDens * vec2(1.5, 1.0);
   vec2 gcell = floor(gq), guv = fract(gq);
   float gh = fract(sin(dot(gcell + uSeed, vec2(12.9898, 78.233))) * 43758.5453);
-  float code = uSet[int(min(gh * uSetLen, uSetLen - 1.0))];
+  float lum0 = max(gl_FragColor.r, max(gl_FragColor.g, gl_FragColor.b));
+  float gk = clamp(lum0 * uShade + gh * (1.0 - uShade * 0.62), 0.0, 0.999);
+  float code = uSet[int(gk * uSetLen)];
+  if (uShade > 0.0) gl_FragColor.rgb = gl_FragColor.rgb / max(lum0, 0.001) * clamp(mix(0.42, 1.0, lum0), 0.0, 1.15);
   vec2 auv = vec2((mod(code, 16.0) + clamp(guv.x, 0.06, 0.94)) / 16.0, 1.0 - (floor(code / 16.0) + clamp(1.0 - guv.y, 0.04, 0.96)) / 6.0);
   float gm = textureGrad(tGlyph, auv, dFdx(gq) / vec2(16.0, 6.0), dFdy(gq) / vec2(16.0, 6.0)).r;
-  gl_FragColor.rgb *= smoothstep(0.08, 0.6, gm) ;
+  float tiny = smoothstep(0.22, 0.55, length(dFdx(gq)));     // letters too small to read: fill in, so far things stay bright
+  gl_FragColor.rgb *= mix(smoothstep(0.08, 0.6, gm), 0.8, tiny);
 }
 `;
 
@@ -78,7 +82,7 @@ export function gmat(hex, kind, opt = {}) {
   if (opt.lift && !opt.glow) { m.emissive = new THREE.Color(hex).multiplyScalar(opt.lift); }   // never falls fully into shadow
   if (opt.depthFunc) { m.depthFunc = opt.depthFunc; m.depthWrite = false; }
   const codes = new Array(12).fill(0); [...set].forEach((c, i) => { if (i < 12) codes[i] = c.charCodeAt(0) - 32; });
-  const u = { tGlyph: shared.tGlyph, uTime: shared.uTime, uSet: { value: codes }, uSetLen: { value: Math.min(12, set.length) }, uDens: { value: opt.dens || dens }, uSeed: { value: (hex % 97) * 0.37 }, uSway: { value: opt.sway ?? sway } };
+  const u = { tGlyph: shared.tGlyph, uTime: shared.uTime, uSet: { value: codes }, uSetLen: { value: Math.min(12, set.length) }, uDens: { value: opt.dens || dens * 1.45 }, uSeed: { value: (hex % 97) * 0.37 }, uSway: { value: opt.sway ?? sway }, uShade: { value: opt.glow ? 0 : 0.72 } };
   m.userData.glyph = u;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);

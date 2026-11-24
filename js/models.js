@@ -80,7 +80,7 @@ export function makeHero() {
   part(quill, G.box, Gl(0xf0e8ff, 'quill'), 0.03, 0.46, 0.85, 0, 0.19, -0.02).rotation.x = 0.2;
   part(quill, G.box, Gl(0xf0e8ff, 'quill'), 0.03, 0.32, 0.55, 0, -0.11, -0.1).rotation.x = -0.25;
   const tipMark = new THREE.Object3D(); tipMark.position.set(0, 0, 1.85); quill.add(tipMark);
-  const baseMark = new THREE.Object3D(); baseMark.position.set(0, 0, 0.5); quill.add(baseMark);
+  const baseMark = new THREE.Object3D(); baseMark.position.set(0, 0, 1.25); quill.add(baseMark);
   const armL = new THREE.Group(); armL.position.set(-0.38, 1.92, 0.02); body.add(armL);
   part(armL, G.cyl, coat, 0.17, 0.62, 0.17, -0.05, -0.26, 0.12).rotation.x = -0.5;
   part(armL, G.sph, skin, 0.15, 0.15, 0.15, -0.07, -0.52, 0.28);
@@ -162,7 +162,7 @@ export function makeLetter(ch) {
   return { g, lit, dim, cage };
 }
 export function makeHeart() {
-  const s = glyphSprite('♥', '#ff6a9a', 96); s.scale.set(0.9, 0.9, 1); s.position.y = 0.7;
+  const s = glyphSprite('♥', '#ff6a9a', 96); s.scale.set(0.7, 0.7, 1); s.position.y = 0.7;
   const g = new THREE.Group(); g.add(s); return { g, s };
 }
 export function makeShot() {
@@ -191,7 +191,7 @@ export function makeProp(p) {
     case 'house': case 'cabin': {
       const snow = p.type === 'cabin';
       const wall = L(snow ? 0xd8b088 : [0xffffff, 0xfff0e0, 0xf0e8ff][Math.floor(v * 3)], snow ? 'wood' : 'wall', true);
-      const roof = L(snow ? 0xffffff : [0x8a78ff, 0xff6aa0, 0x6a9aff][Math.floor(v * 7) % 3], snow ? 'snow' : 'roof', true), frame = L(0xc8b090, 'wood');
+      const roof = L(snow ? 0xffffff : [0xe0704e, 0xc05a40, 0x8fa4c8][Math.floor(v * 7) % 3], snow ? 'snow' : 'roof', true), frame = L(0xc8b090, 'wood');
       const w = 3.0, d = 2.3, h = 1.8;
       add(G.box, wall, w, h, d, 0, h / 2, 0);
       add(G.prism, roof, w + 0.5, 1.35, d + 0.6, 0, h, 0).rotation.y = Math.PI / 2;
@@ -220,7 +220,7 @@ export function makeProp(p) {
       g.rotation.y = p.rot; break;
     }
     case 'windmill': {
-      add(G.frust, L(0xffffff, 'wall', true), 2.5, 3.5, 2.5, 0, 1.75, 0); add(G.cone, L(0xff6aa0, 'roof', true), 1.8, 1.1, 1.8, 0, 4.05, 0);
+      add(G.frust, L(0xffffff, 'wall', true), 2.5, 3.5, 2.5, 0, 1.75, 0); add(G.cone, L(0xe0704e, 'roof', true), 1.8, 1.1, 1.8, 0, 4.05, 0);
       add(G.box, WIN, 0.42, 0.54, 0.1, 0, 1.4, 1.02); add(G.box, L(0x9a7a60, 'door'), 0.56, 1.0, 0.1, 0, 0.5, 1.24);
       const hub = new THREE.Group(); hub.position.set(0, 3.6 * s, 1.0 * s); hub.userData.spin = 0.9; g.add(hub);
       for (let i = 0; i < 4; i++) { const b = new THREE.Group(); b.rotation.z = i * Math.PI / 2; hub.add(b); part(b, G.box, L(0xffffff, 'hay'), 0.56 * s, 2.4 * s, 0.06 * s, 0, 1.35 * s, 0); part(b, G.box, L(0xc8b090, 'wood'), 0.09 * s, 2.7 * s, 0.09 * s, 0, 1.35 * s, -0.06 * s); }
@@ -254,12 +254,12 @@ export function makeProp(p) {
       g.rotation.y = p.rot; break;
     }
     case 'tree': {
-      const leaf = L([0xa8b8ff, 0xffa8d0, 0xc8b8ff, 0x8fa8ff][Math.floor(v * 4)], 'leaf', true);
-      add(G.cyl, L(0xb8a0c0, 'trunk'), 0.3, 1.5, 0.3, 0, 0.75, 0);
+      const leaf = L([0x5fbf5a, 0x86d468, 0x48a860, 0xffa8d0, 0x6cc860][Math.floor(v * 5)], 'leaf', true);
+      add(G.cyl, L(0xb89878, 'trunk'), 0.3, 1.5, 0.3, 0, 0.75, 0);
       add(G.ico, leaf, 1.9, 1.6, 1.9, 0, 2.1, 0); add(G.ico, leaf, 1.3, 1.2, 1.3, 0.55, 2.75, 0.2); add(G.ico, leaf, 1.2, 1.0, 1.2, -0.6, 2.55, -0.2);
       break;
     }
-    case 'cypress': { const lf = L(v > 0.5 ? 0x9aaaff : 0xb8a0ff, 'needle', true); add(G.cyl, L(0xb8a0c0, 'trunk'), 0.24, 0.8, 0.24, 0, 0.4, 0); add(G.cone, lf, 1.3, 3.2, 1.3, 0, 2.2, 0); add(G.cone, lf, 1.0, 2.2, 1.0, 0, 3.4, 0); break; }
+    case 'cypress': { const lf = L(v > 0.5 ? 0x3f9a58 : 0x58b068, 'needle', true); add(G.cyl, L(0xb89878, 'trunk'), 0.24, 0.8, 0.24, 0, 0.4, 0); add(G.cone, lf, 1.3, 3.2, 1.3, 0, 2.2, 0); add(G.cone, lf, 1.0, 2.2, 1.0, 0, 3.4, 0); break; }
     case 'pine': {
       add(G.cyl, L(0xb0a0b8, 'trunk'), 0.26, 1.0, 0.26, 0, 0.5, 0);
       for (let i = 0; i < 3; i++) { add(G.cone, L(0xa8c0f0, 'needle', true), 1.9 - i * 0.45, 1.2, 1.9 - i * 0.45, 0, 1.3 + i * 0.8, 0); add(G.cone, L(0xffffff, 'snow', true), 1.35 - i * 0.36, 0.5, 1.35 - i * 0.36, 0, 1.78 + i * 0.8, 0); }
@@ -271,7 +271,7 @@ export function makeProp(p) {
       add(G.cyl, w, 0.14, 1.2, 0.14, 0.4, 2.2, 0).rotation.z = -0.9; add(G.cyl, w, 0.12, 1.0, 0.12, -0.36, 1.8, 0.1).rotation.z = 1.0; add(G.cyl, w, 0.1, 0.7, 0.1, 0.1, 2.7, 0.2).rotation.x = 0.7;
       break;
     }
-    case 'bush': add(G.ico, L(v > 0.5 ? 0xa8b8ff : 0xffa8d0, 'leaf', true), 1.0, 0.7, 1.0, 0, 0.35, 0); add(G.ico, L(0xc8b8ff, 'leaf', true), 0.7, 0.55, 0.7, 0.4, 0.3, 0.2); break;
+    case 'bush': add(G.ico, L(v > 0.75 ? 0xffa8d0 : 0x6cc860, 'leaf', true), 1.0, 0.7, 1.0, 0, 0.35, 0); add(G.ico, L(0x48a860, 'leaf', true), 0.7, 0.55, 0.7, 0.4, 0.3, 0.2); break;
     case 'reed': for (let i = 0; i < 5; i++) { const a = i * 1.3 + v * 6; add(G.cyl, L(i % 2 ? 0x8af0d8 : 0xc4f8bc, 'reed'), 0.07, 1.0 + (i % 3) * 0.4, 0.07, Math.cos(a) * 0.25, 0.6 + (i % 3) * 0.2, Math.sin(a) * 0.25).rotation.z = Math.cos(a) * 0.15; } break;
     case 'rock': add(G.ico, L(0xd0cce8, 'stone', true), 0.9, 0.6, 0.8, 0, 0.26, 0).rotation.y = p.rot; break;
     case 'stone': add(G.box, L(0xe0dcf8, 'stone', true), 0.6, 1.5, 0.32, 0, 0.75, 0).rotation.y = p.rot * 0.2; add(G.box, L(0xc0bcd8, 'stone', true), 0.8, 0.2, 0.5, 0, 0.1, 0); break;
@@ -319,7 +319,7 @@ export function makeProp(p) {
     case 'well': {
       add(G.cyl, L(0xe0dcf8, 'brick', true), 1.3, 0.7, 1.3, 0, 0.35, 0); add(G.cyl, L(0x5a8aff, 'ice'), 1.0, 0.06, 1.0, 0, 0.7, 0);
       add(G.cyl, L(0xd0b890, 'wood'), 0.12, 1.5, 0.12, -0.6, 0.95, 0); add(G.cyl, L(0xd0b890, 'wood'), 0.12, 1.5, 0.12, 0.6, 0.95, 0);
-      add(G.prism, L(0xff6aa0, 'roof', true), 1.7, 0.5, 1.1, 0, 1.7, 0); break;
+      add(G.prism, L(0xe0704e, 'roof', true), 1.7, 0.5, 1.1, 0, 1.7, 0); break;
     }
     case 'crates': {
       const w = L(0xe0c8a0, 'wood', true);

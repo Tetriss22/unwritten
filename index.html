@@ -20,14 +20,26 @@ body { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; fon
 .layer { position: fixed; inset: 0; pointer-events: none; }
 #hud { padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); opacity: 0; transition: opacity .6s; }
 #hud.on { opacity: 1; }
-#chapter { font-size: 11px; letter-spacing: .22em; color: var(--dim); }
-#hearts { margin-top: 6px; font-size: 20px; letter-spacing: .12em; color: var(--pink); text-shadow: 0 0 12px rgba(243,160,200,.5); }
-#hearts i { font-style: normal; color: #3a3650; text-shadow: none; }
-#word { margin-top: 8px; font-size: 24px; font-weight: 800; letter-spacing: .34em; color: var(--gold); text-shadow: 0 0 14px rgba(255,241,201,.45); }
-#word i { font-style: normal; color: #4a4668; text-shadow: none; }
+#panel { display: inline-block; min-width: 230px; padding: 8px 12px 10px; background: rgba(4,5,10,.82); border: 1px solid #c8c4e0; }
+#panel b { font-weight: 800; color: var(--dim); font-size: 11px; letter-spacing: .14em; margin-right: 6px; }
+#chapter { font-size: 12px; font-weight: 800; letter-spacing: .1em; color: #fff; }
+#hearts { margin-top: 6px; font-size: 15px; letter-spacing: .02em; color: #fff; white-space: nowrap; }
+#hearts i { font-style: normal; color: #4a4668; }
+#hearts small { font-size: 11px; color: var(--dim); margin-left: 4px; }
+#word { margin-top: 5px; font-size: 16px; font-weight: 800; letter-spacing: .3em; color: var(--gold); white-space: nowrap; }
+#word i { font-style: normal; color: #4a4668; }
+.lab { position: absolute; left: 0; top: 0; font-size: 11px; font-weight: 800; letter-spacing: .04em; color: #fff; text-align: center; text-shadow: 0 0 4px #000, 0 0 2px #000; white-space: nowrap; will-change: transform; display: none; }
+.lab i { display: block; width: 38px; height: 4px; margin: 2px auto 0; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.55); }
+.lab b { display: block; height: 100%; background: #ff3a5a; }
+.lab.you i { display: none; }
+.ft { position: absolute; left: 0; top: 0; font-weight: 800; font-size: 17px; color: #fff; text-shadow: 0 0 5px #000, 0 0 2px #000; will-change: transform, opacity; white-space: nowrap; }
+.ft.crit { font-size: 23px; color: var(--gold); }
+.ft.hurt { color: var(--red); font-size: 20px; }
+.ft.miss { color: var(--dim); font-size: 13px; }
+.ft.gain { color: var(--gold); font-size: 22px; }
 #word.done { animation: pulse 1.2s ease-in-out 3; }
 @keyframes pulse { 50% { color: #fff; text-shadow: 0 0 26px #fff1c9; } }
-#lanterns { margin-top: 8px; font-size: 15px; letter-spacing: .2em; color: var(--gold); }
+#lanterns { margin-top: 5px; font-size: 13px; letter-spacing: .2em; color: var(--gold); }
 #lanterns i { font-style: normal; color: #4a4668; }
 #lanterns small { font-size: 10px; letter-spacing: .2em; color: var(--dim); }
 #map { opacity: 0; transition: opacity .25s; }
@@ -84,16 +96,18 @@ body.touch #msg { bottom: 27%; }
 <canvas id="game" aria-label="UNWRITTEN game view"></canvas>
 
 <div id="hud" class="layer">
-  <div id="chapter"></div>
+  <div id="panel"><div id="chapter"></div>
   <div id="hearts" aria-label="health"></div>
   <div id="word" aria-label="word to write"></div>
-  <div id="lanterns" aria-label="lanterns lit"></div>
+  <div id="lanterns" aria-label="lanterns lit"></div></div>
   <div id="tools"><button id="zout" type="button" aria-label="zoom out">&minus;</button><button id="zmap" type="button" aria-label="toggle map view">MAP</button><button id="zin" type="button" aria-label="zoom in">+</button><button id="snd" type="button" aria-label="toggle sound">SOUND ON</button><button id="pz" type="button" aria-label="pause">II</button></div>
   <div id="boss"><b>THE EDITOR</b><div id="bossbar"><div></div></div></div>
   <div id="arrow">&gt;<small></small></div>
   <div id="msg"></div>
   <div id="hint"></div>
 </div>
+
+<div id="fx" class="layer"><div id="you2" class="lab you">Scribe</div></div>
 
 <div id="map" class="layer"><div class="ml"></div><div class="ml"></div><div class="ml"></div><div class="ml"></div><div class="ml"></div><div id="you">YOU<br>&#9660;</div></div>
 

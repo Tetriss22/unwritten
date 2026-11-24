@@ -36,11 +36,11 @@ A lit lantern makes its whole land brighter, which you can see from the map view
 Everything on screen is text.
 
 - The camera is isometric: turned 32 degrees and tilted, so buildings show two walls and a roof and roads run diagonally.
-- Everything standing on the page is real low-poly 3D whose surfaces are written in letters. Each kind of surface has its own symbols and letter size: walls in `H#N[]=I`, roofs in `=^/\A`, leaves in `&%@oO8`, the unwriters in heavy purple `@&%8$#`. The letters live in the surface's own space, so they wrap around towers, lie flat on roofs and move with whatever they are painted on.
-- The Scribe is written in the smallest, whitest letters on the page, so nothing else looks like the hero. A dim outline shows through walls and trees.
-- The ground is read from one terrain texture through the same camera, as a grid of bold glyphs glued to the world.
-- Movement has weight: the coat is a stack of rings on springs, so the hem lags, swings and flares; the scarf and hood trail; the quill leaves a ribbon in the air and a scar of `x = ~` on the ground where it cut.
-- Wind crosses the world in bands: grass, wheat, reeds and tree crowns lean with each gust, and grass bends away from your feet.
+- Stone, ash and snow are dense running text: a noise decides how heavy each letter is, from `. : -` up to `W N M @ B`, and brighter stone gets heavier letters.
+- Grass is its own finer, staggered layer of blades (`/ | \ ! '`) drawn over the ground. Every blade leans with the wind as gusts cross the world, bends away from your feet, and takes the colour of nearby light. Wheat is the same layer in gold.
+- Everything standing on the page is real low-poly 3D whose surfaces are written in letters, heavier on the lit side. Each kind of surface has its own symbols and letter size; the Scribe is written in the smallest, whitest letters on the page, and a dim outline shows through walls and trees.
+- Fights read like an RPG: dotted `o` rings show where an attack will land, hits throw numbers, awake enemies carry a name and a health bar, and every hit, kill and slam flashes its own light across the ground.
+- Movement has weight: the coat is a stack of rings on springs, the scarf and hood trail, and the quill leaves a ribbon in the air and a scar of `x = ~` on the ground.
 - Two low-resolution passes of the same scene give shadows on the ground and reflections in water.
 - Sound and music are synthesised with Web Audio. There are no image or audio files.
 

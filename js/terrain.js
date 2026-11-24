@@ -61,53 +61,63 @@ export class Terrain {
 }
 
 // paint one cell from a material description; pal indices are local to the land (16 colours each)
+// ramp: dense text whose letters get heavier and brighter where a stone-like noise is high
+// grass: the renderer draws these cells as a finer layer of blades; the letter here is only used far away
+export const STONE = ".:-~;=+*rcsxzvuoawdbpq%&$#08QWNM@B", ASH = ".,:;=+x%#&@", SNOW = ".'`,:*+";
+const BLADES = "|/\\!'\"";
 function paint(T, cx, cy, m, seed, reg, word) {
-  const n = vnoise(cx / (m.scale || 13), cy / (m.scale || 13), seed + 3);
-  const band = m.bands[Math.min(m.bands.length - 1, Math.floor(n * m.bands.length))];
   const a = h2(cx, cy, seed), b = h2(cx, cy, seed + 9), c = h2(cx, cy, seed + 21);
-  let chr = band[Math.floor(a * band.length)];
-  if (m.sparse && c < m.sparse) chr = ' ';
   const pal = m.pal[Math.floor(b * m.pal.length)];
-  const bri = m.bri[0] + (m.bri[1] - m.bri[0]) * c;
-  // written ground: the cell only says which sentence; the renderer lays the letters out on screen
+  let bri = m.bri[0] + (m.bri[1] - m.bri[0]) * c, chr;
   const tid = word !== undefined ? word : m.tid;
   if (tid !== undefined) { if (c < (m.gap || 0)) T.put(cx, cy, c < (m.gap || 0) * 0.4 ? '_' : ' ', reg * 16 + pal, bri, 0); else T.putRaw(cx, cy, tid, reg * 16 + pal, bri, 7); return; }
+  if (m.ramp) {
+    const n = fbm(cx / (m.scale || 4.5), cy / (m.scale || 4.5), seed + 3), k = Math.max(0, Math.min(1, (n - 0.22) / 0.56));
+    // the cell stores only how heavy the letter should be; the renderer picks the letter per glyph cell
+    T.putRaw(cx, cy, Math.round(k * 255), reg * 16 + pal, m.bri[0] + (m.bri[1] - m.bri[0]) * k, m.ramp === STONE ? 9 : m.ramp === ASH ? 10 : 11); return;
+  } else if (m.grass) chr = BLADES[Math.floor(a * BLADES.length)];
+  else {
+    const n = vnoise(cx / 13, cy / 13, seed + 3), band = m.bands[Math.min(m.bands.length - 1, Math.floor(n * m.bands.length))];
+    chr = band[Math.floor(a * band.length)];
+  }
+  if (m.sparse && c < m.sparse) chr = ' ';
   const kind = (m.kind && h2(cx, cy, seed + 33) < (m.kindP ?? 1)) ? m.kind : 0;
   T.put(cx, cy, chr, reg * 16 + pal, bri, kind);
 }
 
-// ---------- the five lands
+// ---------- the five lands. Palette slots: 1-4 ground, 5-6 water, 7-8 the wilds, 10-11 gold, 14-15 flowers
 export const LANDS = [
   {
     roman: 'I', name: 'THE MARGIN', sub: 'where every page begins', word: 'BRIDGE', seed: 11,
     line: 'Something is deleting the world, one word at a time.', doneLine: 'BRIDGE. You wrote it back.',
-    palette: ['#000000', '#c2ccff', '#ffb4d6', '#ffffff', '#d4c8ff', '#5a8aff', '#e0f0ff', '#5a6cd0', '#7a8cf0', '#4a78ff', '#ffd9a0', '#fff1c9', '#ff5a4d', '#ffffff', '#7dffc9', '#ff9ad5'],
-    bg: [0.012, 0.014, 0.04], ambient: [0.62, 0.66, 0.91], amb3d: [0x8090ff, 0.6], moon: [0xcfd8ff, 1.5],
-    weather: [0, 0, [1, 1, 1]], dark: 0, lightR: 6.4, rough: 1.0, edgeW: 2.6,
+    palette: ['#000000', '#58c060', '#9be070', '#e6e6de', '#3a9a54', '#4a8aff', '#d8ecff', '#2c8046', '#3c9450', '#4a8aff', '#ffd98a', '#fff1c9', '#ff5a4d', '#ffffff', '#ffffff', '#ff9ad5'],
+    bg: [0.006, 0.012, 0.014], ambient: [0.6, 0.68, 0.64], amb3d: [0x98c8a8, 0.6], moon: [0xdfe8ff, 1.5],
+    weather: [0, 0, [1, 1, 1]], dark: 0, lightR: 6.6, rough: 1.0, edgeW: 2.6,
     mats: {
-      floor: { bands: ['<>=<>+', '++;+:+', ';~:;,;'], pal: [1, 1, 2, 4], bri: [0.7, 1.15], kind: 2, kindP: 0.22 },
-      path: { bands: ['.:. ', ' ._.'], pal: [3], bri: [0.5, 0.85] },
-      edge: { bands: ['"!|;', '|!\'"'], pal: [8, 1, 2], bri: [0.6, 1.0], kind: 2 },
-      outside: { bands: ['"\'|!', ';:"\'', '|!;:'], pal: [7, 7, 8], bri: [0.5, 0.85], sparse: 0.08, kind: 2 },
-      field: { bands: ['|!|"', '!|\'|'], pal: [10, 10, 11], bri: [0.7, 1.1], kind: 8 },
+      floor: { grass: 1, pal: [1, 1, 2, 4], bri: [0.78, 1.2], kind: 2 },
+      path: { ramp: STONE, pal: [3], bri: [0.55, 1.15] },
+      edge: { grass: 1, pal: [2, 1], bri: [0.8, 1.2], kind: 2 },
+      outside: { grass: 1, pal: [7, 7, 8], bri: [0.6, 0.95], kind: 2 },
+      field: { grass: 1, pal: [10, 10, 11], bri: [0.75, 1.15], kind: 8 },
       barrier: { bands: ['~'], pal: [5], bri: [0.9, 1.1], kind: 1 },
       bridge: { bands: ['='], pal: [10], bri: [1.0, 1.3], kind: 5 },
     },
-    props: { build: ['house', 'house', 'house', 'house', 'windmill', 'tower'], low: ['bush', 'rock', 'bush'], border: ['tree', 'tree', 'cypress', 'bush'], borderP: 0.5, inner: ['rock', 'bush', 'stone'], innerP: 0.3, lamp: 'lamp', lampCol: [1.0, 0.82, 0.55] },
+    props: { build: ['house', 'house', 'house', 'house', 'windmill', 'tower'], low: ['bush', 'rock', 'bush'], border: ['tree', 'tree', 'cypress', 'bush'], borderP: 0.5, inner: ['rock', 'bush', 'stone'], innerP: 0.3, lamp: 'lamp', lampCol: [1.0, 0.72, 0.38] },
     music: { root: 57, scale: [0, 2, 3, 7, 10], tempo: 0.42 },
   },
   {
     roman: 'II', name: 'THE DROWNED SHELVES', sub: 'a library the rain kept', word: 'STONE', seed: 23,
     line: 'They cut the roof first. Then the floor.', doneLine: 'STONE. The water remembers a road.',
-    palette: ['#000000', '#8af0d8', '#c4f8bc', '#f4fbe8', '#5fd0c8', '#2a9ad0', '#c8f8ff', '#2a8ab8', '#44b0d8', '#2a8ab8', '#e8dfc0', '#ffe9a8', '#ff5a4d', '#ffffff', '#ffc86b', '#7ff0d8'],
-    bg: [0.006, 0.02, 0.028], ambient: [0.56, 0.78, 0.82], amb3d: [0x70c0c0, 0.55], moon: [0xc8fff0, 1.3],
-    weather: [1, 0.07, [0.55, 0.85, 0.95]], dark: 0.05, lightR: 6.0, rough: 0.5, edgeW: 1.8,
+    palette: ['#000000', '#62d8b8', '#a8ecb0', '#e2ebe6', '#48b09c', '#2a9ad0', '#c8f8ff', '#1f7aa8', '#3aa0cc', '#1f7aa8', '#e8dfc0', '#ffe9a8', '#ff5a4d', '#ffffff', '#ffffff', '#ffc86b'],
+    bg: [0.004, 0.014, 0.02], ambient: [0.56, 0.72, 0.74], amb3d: [0x80c8c8, 0.55], moon: [0xc8fff0, 1.3],
+    weather: [1, 0.07, [0.55, 0.85, 0.95]], dark: 0.05, lightR: 6.2, rough: 0.5, edgeW: 1.8,
     mats: {
-      floor: { bands: [',;",', '.:;\'', '+;,:'], pal: [1, 1, 2, 4], bri: [0.7, 1.15], kind: 2, kindP: 0.15 },
-      field: { bands: ['|!/|', '!|\\!'], pal: [2, 1, 15], bri: [0.65, 1.05], kind: 8 },
-      path: { bands: ['=-=', '-=_'], pal: [10, 3], bri: [0.55, 0.9] },
-      edge: { bands: ['|!/|', '!|\\!'], pal: [2, 4, 1], bri: [0.6, 1.0], kind: 2 },
+      floor: { ramp: STONE, pal: [3, 3, 10], bri: [0.38, 1.05] },
+      moss: { grass: 1, pal: [1, 2, 4], bri: [0.65, 1.1], kind: 2 },
+      path: { ramp: STONE, pal: [10], bri: [0.6, 1.2] },
+      edge: { grass: 1, pal: [2, 4, 1], bri: [0.7, 1.1], kind: 2 },
       outside: { bands: ['~'], pal: [7, 7, 8], bri: [0.7, 1.0], kind: 1 },
+      field: { grass: 1, pal: [2, 1, 4], bri: [0.7, 1.1], kind: 8 },
       barrier: { bands: ['~'], pal: [7, 8], bri: [0.7, 1.0], kind: 1 },
       bridge: { bands: ['O'], pal: [10], bri: [1.0, 1.3], kind: 5 },
     },
@@ -117,19 +127,19 @@ export const LANDS = [
   {
     roman: 'III', name: 'CINDER ROW', sub: 'a street struck through in red', word: 'RAIN', seed: 37,
     line: 'Red ink burns. Do not stand on the corrections.', doneLine: 'RAIN. The corrections go cold.',
-    palette: ['#000000', '#ffb07a', '#e88a64', '#fff0dc', '#d0c0bc', '#ff5a2a', '#ffd27a', '#8a5a54', '#b87868', '#ff4a1a', '#9fb4c8', '#ffe9a8', '#ff3a2a', '#ffffff', '#7fd0ff', '#ffb080'],
-    bg: [0.03, 0.01, 0.008], ambient: [0.78, 0.56, 0.50], amb3d: [0xff9070, 0.55], moon: [0xffc8a0, 1.3],
-    weather: [3, 0.06, [1.0, 0.55, 0.25]], dark: 0.08, lightR: 6.0, rough: 0.9, edgeW: 2.4,
+    palette: ['#000000', '#ff9a5c', '#d07a54', '#f0e6dc', '#a8a09c', '#ff5a2a', '#ffd27a', '#6e5854', '#8e6e64', '#ff4a1a', '#9fb4c8', '#ffe9a8', '#ff3a2a', '#ffffff', '#ffd27a', '#ff9a5c'],
+    bg: [0.02, 0.008, 0.006], ambient: [0.72, 0.56, 0.5], amb3d: [0xffa080, 0.55], moon: [0xffc8a0, 1.3],
+    weather: [3, 0.06, [1.0, 0.55, 0.25]], dark: 0.08, lightR: 6.2, rough: 0.9, edgeW: 2.4,
     mats: {
-      floor: { bands: ['.,:;', '+=#+', ';:.\''], pal: [4, 4, 2, 3], bri: [0.65, 1.1] },
-      field: { bands: [",'.`", '.,:;'], pal: [2, 8, 4], bri: [0.5, 0.85] },
-      path: { bands: ['.:.', ' ._'], pal: [3], bri: [0.5, 0.8] },
-      edge: { bands: ['%#&;', '#%:.'], pal: [8, 2, 4], bri: [0.5, 0.9] },
-      outside: { bands: ['#%&@', '%#.:', '&#%.'], pal: [7, 7, 8], bri: [0.4, 0.7], sparse: 0.3 },
+      floor: { ramp: ASH, pal: [4, 4, 3], bri: [0.38, 1.0] },
+      path: { ramp: STONE, pal: [3], bri: [0.5, 1.1] },
+      edge: { ramp: ASH, pal: [8, 2, 4], bri: [0.4, 0.9] },
+      outside: { ramp: STONE, pal: [7, 7, 8], bri: [0.3, 0.8] },
+      field: { grass: 1, pal: [2, 8, 1], bri: [0.5, 0.9], kind: 2 },
       barrier: { bands: ['^'], pal: [9, 5, 6], bri: [1.0, 1.4], kind: 3 },
       bridge: { bands: [':'], pal: [10], bri: [0.9, 1.2], kind: 5 },
       hazard: { bands: ['~'], pal: [5, 9, 6], bri: [1.0, 1.4], kind: 3 },
-      cooled: { bands: [':.;,'], pal: [10, 4], bri: [0.5, 0.8] },
+      cooled: { ramp: ASH, pal: [10, 4], bri: [0.45, 0.85] },
     },
     props: { build: ['burnt', 'burnt', 'burnt', 'tower'], low: ['rock', 'rock', 'brazier'], border: ['wall', 'deadtree', 'deadtree', 'rock'], borderP: 0.42, inner: ['rock', 'deadtree', 'brazier'], innerP: 0.3, lamp: 'brazier', lampCol: [1.0, 0.6, 0.3] },
     music: { root: 50, scale: [0, 1, 5, 7, 8], tempo: 0.4 },
@@ -137,14 +147,14 @@ export const LANDS = [
   {
     roman: 'IV', name: 'WHITEOUT PASS', sub: 'the page before the ink', word: 'FIRE', seed: 51,
     line: 'Up here nothing has been written yet. That is the danger.', doneLine: 'FIRE. The wall forgets it was ice.',
-    palette: ['#000000', '#f0f6ff', '#c4dcff', '#ffffff', '#b0ccf8', '#7fd8ff', '#ffffff', '#6a80b0', '#90a8d0', '#9fe8ff', '#ffb070', '#ffe9a8', '#ff5a4d', '#ffffff', '#ffb070', '#c8e0ff'],
-    bg: [0.02, 0.026, 0.045], ambient: [0.62, 0.72, 0.88], amb3d: [0xa0c0ff, 0.65], moon: [0xe8f0ff, 1.4],
-    weather: [2, 0.18, [0.9, 0.95, 1.0]], dark: 0.25, lightR: 5.4, rough: 1.0, edgeW: 2.6,
+    palette: ['#000000', '#f0f6ff', '#c4dcff', '#ffffff', '#b0ccf8', '#7fd8ff', '#ffffff', '#5a70a0', '#8098c0', '#9fe8ff', '#ffb070', '#ffe9a8', '#ff5a4d', '#ffffff', '#ffffff', '#c8e0ff'],
+    bg: [0.014, 0.02, 0.036], ambient: [0.6, 0.7, 0.86], amb3d: [0xa8c8ff, 0.65], moon: [0xe8f0ff, 1.4],
+    weather: [2, 0.18, [0.9, 0.95, 1.0]], dark: 0.2, lightR: 5.6, rough: 1.0, edgeW: 2.6,
     mats: {
-      floor: { bands: ['.,\'.', ':.:.', '.\'`,'], pal: [1, 1, 2, 4], bri: [0.65, 1.1], kind: 4, kindP: 0.5, sparse: 0.05 },
-      path: { bands: ['.:.', ':. '], pal: [3], bri: [0.6, 0.9] },
-      edge: { bands: ['*+:.', '.:*\''], pal: [1, 2, 3], bri: [0.6, 1.0], kind: 4 },
-      outside: { bands: ['#MW^', 'A^#.', '^#:.'], pal: [7, 7, 8], bri: [0.4, 0.75], sparse: 0.25 },
+      floor: { ramp: SNOW, pal: [1, 1, 2, 4], bri: [0.5, 1.1], kind: 4, kindP: 0.5 },
+      path: { ramp: STONE, pal: [4, 2], bri: [0.45, 1.0] },
+      edge: { ramp: SNOW, pal: [1, 3], bri: [0.6, 1.15], kind: 4 },
+      outside: { ramp: STONE, pal: [7, 7, 8], bri: [0.32, 0.85] },
       barrier: { bands: ['#|H#', '|#|I'], pal: [9, 5, 13], bri: [0.9, 1.4], kind: 5 },
       bridge: { bands: ['~'], pal: [10], bri: [0.9, 1.2], kind: 5 },
       ice: { bands: ['/-=\\', '-/_-'], pal: [5, 9], bri: [0.6, 1.0] },
@@ -156,11 +166,11 @@ export const LANDS = [
     roman: 'V', name: 'THE BLANK', sub: 'the desk of the Editor', word: 'END', seed: 67,
     line: 'Every story it cut never got an ending. Write one.', doneLine: 'END. Now go and say it to the Editor.',
     palette: ['#000000', '#dcd0ff', '#ffffff', '#f6f0ff', '#b0a0f0', '#6a5acd', '#ffffff', '#6a58a8', '#8a78c8', '#6a58a8', '#ffe9a8', '#ffe9a8', '#ff3a5a', '#ffffff', '#ff3a5a', '#e0d0ff'],
-    bg: [0.012, 0.008, 0.026], ambient: [0.59, 0.53, 0.82], amb3d: [0xa090ff, 0.55], moon: [0xe0d8ff, 1.3],
+    bg: [0.01, 0.006, 0.022], ambient: [0.6, 0.54, 0.82], amb3d: [0xa898ff, 0.55], moon: [0xe0d8ff, 1.3],
     weather: [3, 0.03, [0.8, 0.7, 1.0]], dark: 0.15, lightR: 6.0, rough: 0.25, edgeW: 1.7,
     mats: {
-      floor: { bands: ['x'], tid: 6, gap: 0.3, pal: [1, 1, 2, 4], bri: [0.6, 1.1] },
-      path: { bands: ['x'], tid: 7, gap: 0.1, pal: [3, 2], bri: [0.8, 1.15] },
+      floor: { tid: 6, gap: 0.3, pal: [1, 1, 2, 4], bri: [0.6, 1.1] },
+      path: { tid: 7, gap: 0.1, pal: [3, 2], bri: [0.8, 1.15] },
       edge: { bands: ['_. _', ' ._ '], pal: [4, 8], bri: [0.5, 0.8] },
       outside: { bands: ['.'], pal: [7, 8], bri: [0.5, 0.9], kind: 6 },
       barrier: { bands: ['.'], pal: [7, 8], bri: [0.5, 0.9], kind: 6 },
@@ -293,9 +303,9 @@ export function buildWorld() {
     if (pd < 0.42) paint(T, cx, cy, m.path, seed, land);
     else if (d > -0.5) paint(T, cx, cy, m.edge, seed, land);
     else if (m.field && pd > 0.7 && bucket(ux, uy).n.some(n => n.field && Math.hypot(ux - n.x, uy - n.y) - n.r < -0.4 + (fbm(ux, uy, 9) - 0.5))) paint(T, cx, cy, m.field, seed, land);
+    else if (m.moss && pd > 0.55 && fbm(ux * 0.45, uy * 0.45, seed + 60) > 0.55) paint(T, cx, cy, m.moss, seed, land);
     else paint(T, cx, cy, m.floor, seed, land);
     if (land === 0) {
-      if (pd > 0.6 && fbm(ux * 0.5, uy * 0.5, seed + 40) > 0.66 && h2(cx, cy, 77) < 0.3) T.put(cx, cy, '*', h2(cx, cy, 5) < 0.5 ? 15 : 14, 1.0 + h2(cx, cy, 6) * 0.4, 0);
     } else if (land === 1) {
       if (d > -0.62 || (pd > 0.7 && fbm(ux * 0.7, uy * 0.7, seed + 40) > 0.7)) { T.put(cx, cy, '~', 16 + 8, 0.95, 1); T.tag[i] = 3; }
     } else if (land === 2) {

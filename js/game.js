@@ -48,14 +48,14 @@ function updateMsg(dt) {
   } else { msg.hold -= dt; if (msg.hold <= 0) { msg.cur = null; el.innerHTML = ''; } }
 }
 function hudHearts() {
-  let s = ''; for (let i = 0; i < P.maxHp; i++) s += i < P.hp ? '♥' : '<i>♥</i>';
-  $('hearts').innerHTML = s;
+  let s = ''; for (let i = 0; i < P.maxHp; i++) s += i < P.hp ? '\u25ae' : '<i>\u25af</i>';
+  $('hearts').innerHTML = '<b>HP</b> ' + s + ' <small>' + Math.max(0, P.hp) + '/' + P.maxHp + '</small>';
 }
 function hudWord() {
   const land = W.lands[S.land], w = land.def.word; let s = '';
   for (let i = 0; i < w.length; i++) s += land.letters[i].state === 'taken' ? w[i] : '<i>_</i>';
-  $('word').innerHTML = s; $('word').classList.toggle('done', land.wordDone);
-  $('chapter').textContent = land.def.roman + ' · ' + land.def.name;
+  $('word').innerHTML = '<b>WORD</b> ' + s; $('word').classList.toggle('done', land.wordDone);
+  $('chapter').textContent = 'Scribe · ' + land.def.roman + ' ' + land.def.name;
   let l = ''; for (let i = 0; i < 4; i++) l += W.lands[i].lit ? '◆' : '<i>◇</i>';
   $('lanterns').innerHTML = l + ' <small>LANTERNS</small>';
 }
@@ -74,6 +74,14 @@ function burst(x, y, h, n, hex = 0xffffff, sp = 4.5) {
     W.parts.push({ m, x, y, h, vx: Math.cos(a) * s, vy: Math.sin(a) * s, vh: rnd(2, 6), life: rnd(0.4, 0.9) });
   }
 }
+// a short flash of light on the ground: hits, kills, slams
+function glow(x, y, r, int, col, life) { W.glows.push({ x, y, r, int, col, life, max: life }); if (W.glows.length > 10) W.glows.shift(); }
+// numbers and words that float up from a hit
+const floats = [];
+function floatText(x, y, h, text, cls) {
+  const el = document.createElement('div'); el.className = 'ft ' + cls; el.textContent = text; $('fx').appendChild(el);
+  floats.push({ el, x: x + rnd(-0.3, 0.3), y, h, t: performance.now() }); if (floats.length > 24) floats.shift().el.remove();
+}
 function removeObj(o) { if (o && o.parent) o.parent.remove(o); }
 
 // ---------------------------------------------------------------- world
@@ -83,7 +91,7 @@ function loadWorld() {
   W = { B, T: B.T, lamps: B.lamps.slice(), letters: [], gates: B.gates, enemies: [], shots: [], hearts: [], parts: [], pulses: [], flames: [], floats: [], barrierProps: [], lines: [], slams: [], rewrites: [], bossState: 'wait', boss: null, hinted: false, bossTries: 0, wx: { type: 0, amt: 0, col: [1, 1, 1] } };
   W.lands = LANDS.map((def, i) => ({ def, i, letters: [], wordDone: false, lit: false, entered: false, weather: def.weather.slice(), goal: B.goals[i], beacon: null }));
   R.setTerrain(B.T); R.setPalette(LANDS.flatMap(l => l.palette)); R.setTexts(TEXTS);
-  W.spins = []; W.scars = [];
+  W.spins = []; W.scars = []; W.glows = [];
   // the ribbon the quill leaves in the air
   const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL * 18), 3)); tg.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(TRAIL * 18).map((_, i) => i % 3 === 1 ? 1 : 0), 3));
   W.trail = new THREE.Mesh(tg, gmat(0xff9ad5, 'slash', { glow: true, side: THREE.DoubleSide })); W.trail.frustumCulled = false; W.trail.layers.set(2); W.trailPts = []; R.root.add(W.trail);
@@ -149,10 +157,12 @@ function moveEnt(e, dx, dy, r) {
 
 // ---------------------------------------------------------------- player
 function hurtPlayer(dmg, fx, fy, kb = 7) {
+  if (P.dashT > 0 && S.mode === 'play' && S.t - (P.missT || -9) > 0.5) { P.missT = S.t; floatText(P.x, P.y, 2.6, 'miss', 'miss'); }
   if (P.inv > 0 || P.dashT > 0 || S.mode !== 'play') return;
   P.hp -= dmg; P.inv = 1.15;
   const a = Math.atan2(P.y - fy, P.x - fx); P.kx = Math.cos(a) * kb; P.ky = Math.sin(a) * kb;
   S.flash = 1; S.shake = Math.max(S.shake, 0.5); S.hitstop = 0.09; audio.play('hurt');
+  floatText(P.x, P.y, 2.6, '-' + dmg, 'hurt'); glow(P.x, P.y, 3.2, 1.0, [1, 0.25, 0.35], 0.35);
   burst(P.x, P.y, 1, 6, 0xff8fc8, 4); hudHearts();
   if (P.hp <= 0) die();
 }
@@ -195,6 +205,7 @@ function startAttack(mx, my, moving) {
 function doHit() {
   const spin = P.combo === 3, range = spin ? 2.15 : 1.8, half = spin ? 4 : 1.25, dmg = spin ? 2 : 1;
   if (spin) pulse(P.x, P.y, [1, 0.95, 0.8], 0.9, 9, 0.28, 0.4);
+  glow(P.x + Math.cos(P.face), P.y + Math.sin(P.face), 2.8, 0.7, [1, 0.8, 0.9], 0.14);
   W.scars.push({ x: P.x, y: P.y, a: P.face, t: 0, spin }); if (W.scars.length > 4) W.scars.shift();
   for (const e of W.enemies) {
     if (e.dead) continue;
@@ -325,6 +336,7 @@ function hitEnemy(e, dmg, a) {
   if (e.state === 'sleep') e.state = 'chase';
   if (e.type !== 'boss' && e.type !== 'brute' && (e.state === 'wind' || e.state === 'leap')) { e.state = 'chase'; e.cd = 0.5; }
   burst(e.x, e.y, 0.9, 4, 0xffffff, 4); audio.play('hit');
+  floatText(e.x, e.y, e.type === 'boss' ? 3.6 : 1.9, String(dmg * 10 + Math.floor(rnd(-3, 4))), dmg > 1 ? 'dmg crit' : 'dmg'); glow(e.x, e.y, 2.4, 1.1, [1, 0.95, 0.85], 0.16);
   S.hitstop = Math.max(S.hitstop, dmg > 1 ? 0.07 : 0.04); S.shake = Math.max(S.shake, 0.16);
   if (e.type === 'boss') $('bossbar').firstChild.style.width = clamp(e.hp / e.maxHp * 100, 0, 100) + '%';
   if (e.hp <= 0) killEnemy(e);
@@ -332,7 +344,7 @@ function hitEnemy(e, dmg, a) {
 function killEnemy(e) {
   e.dead = true;
   if (e.type === 'boss') return bossDead(e);
-  removeObj(e.o.g); audio.play('kill');
+  removeObj(e.o.g); audio.play('kill'); glow(e.x, e.y, 4, 1.2, [0.75, 0.55, 1], 0.45);
   burst(e.x, e.y, 0.8, e.type === 'brute' ? 22 : 12, 0xc9a8ff, 6); pulse(e.x, e.y, [0.8, 0.7, 1], 1, 7, 0.5);
   if (Math.random() < (P.hp <= 2 ? 0.45 : 0.16)) addHeart(e.x, e.y);
   if (e.owner) {
@@ -496,7 +508,7 @@ function updateBossHazards(dt) {
     if (!s.set) { s.set = true; [s.x, s.y] = arenaClamp(P.x, P.y); audio.play('warn'); }
     if (!s.done && s.t >= s.dur) {
       s.done = true; S.shake = Math.max(S.shake, 0.7); audio.play('slam');
-      pulse(s.x, s.y, [1, 0.3, 0.4], 1.6, 9, 0.6, 0.6); burst(s.x, s.y, 0.3, 12, 0xff3a5a, 7);
+      pulse(s.x, s.y, [1, 0.3, 0.4], 1.6, 9, 0.6, 0.6); burst(s.x, s.y, 0.3, 12, 0xff3a5a, 7); glow(s.x, s.y, 5, 1.5, [1, 0.3, 0.2], 0.6);
       if (dist(P.x, P.y, s.x, s.y) < 1.75) hurtPlayer(1, s.x, s.y, 9);
     }
   }
@@ -552,7 +564,7 @@ function updateWorld(dt) {
     if (free && d < 1.05 && play) {
       const land = W.lands[l.land];
       l.state = 'taken'; removeObj(o.g); audio.play('letter', land.letters.filter(x => x.state === 'taken').length);
-      pulse(l.x, l.y, [1, 0.95, 0.75], 1.6, 8, 0.8); burst(l.x, l.y, 1.2, 14, 0xfff1c9, 6);
+      pulse(l.x, l.y, [1, 0.95, 0.75], 1.6, 8, 0.8); burst(l.x, l.y, 1.2, 14, 0xfff1c9, 6); glow(l.x, l.y, 6, 1.4, [1, 0.9, 0.6], 0.9); floatText(l.x, l.y, 2.4, '+' + l.ch, 'gain');
       P.cx = l.x; P.cy = l.y; if (P.hp < P.maxHp) { P.hp++; hudHearts(); }
       if (land.letters.every(x => x.state === 'taken')) wordComplete(land); else hudWord();
       save();
@@ -599,6 +611,7 @@ function updateWorld(dt) {
   W.shots = W.shots.filter(s => s.life > 0);
   for (const p of W.parts) { p.life -= dt; p.vh -= 14 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.h = Math.max(0.05, p.h + p.vh * dt); place(p.m, p.x, p.y, p.h); p.m.rotation.x += dt * 9; p.m.rotation.y += dt * 7; if (p.life <= 0) removeObj(p.m); }
   W.parts = W.parts.filter(p => p.life > 0);
+  for (const g of W.glows) g.life -= dt; W.glows = W.glows.filter(g => g.life > 0);
   for (const sc of W.scars) sc.t += dt; W.scars = W.scars.filter(sc => sc.t < 1.5);
   for (const p of W.pulses) { p.life -= dt; p.r = Math.max(0.05, p.r + p.v * dt); }
   W.pulses = W.pulses.filter(p => p.life > 0);
@@ -662,6 +675,7 @@ function fillUniforms() {
     Ls.push(land.lit ? [g.x, g.y, 12, 1.5, 1, 0.92, 0.7, dist(g.x, g.y, S.camX, S.camY) * 0.3] : [g.x, g.y, 3 + bc.channel * 3, 0.5 + bc.channel, 1, 0.9, 0.7, dist(g.x, g.y, S.camX, S.camY)]);
   }
   if (W.boss) Ls.push([W.boss.x, W.boss.y, 4.5, 0.8, 1, 0.2, 0.35, 0]);
+  for (const g of W.glows) Ls.push([g.x, g.y, g.r, g.int * g.life / g.max, ...g.col, 0.5]);
   Ls.sort((a, b) => a[7] - b[7]);
   for (let i = 0; i < MAX_LIGHTS; i++) {
     const l = Ls[i]; if (l) { u.uLights.value[i].set(l[0], l[1], l[2], l[3]); u.uLightCol.value[i].set(l[4], l[5], l[6]); } else u.uLights.value[i].set(0, 0, 1, 0);
@@ -679,9 +693,18 @@ function fillUniforms() {
   er.sort((a, b) => a[3] - b[3]);
   for (let i = 0; i < MAX_ERASE; i++) { const e = er[i]; if (e) u.uErase.value[i].set(e[0], e[1], e[2]); else u.uErase.value[i].set(0, 0, 0); }
   const ps = W.pulses.slice(-MAX_PULSE);
-  for (const s of W.slams) if (s.set && !s.done && ps.length < MAX_PULSE) ps.push({ x: s.x, y: s.y, r: 1.75, life: 1, max: 1, col: [1, 0.15, 0.25], w: 0.9 + Math.sin(S.t * 30) * 0.3 });
   for (let i = 0; i < MAX_PULSE; i++) { const p = ps[i]; if (p) { u.uPulse.value[i].set(p.x, p.y, p.r, p.w * clamp(p.life / p.max, 0, 1)); u.uPulseCol.value[i].set(...p.col); } else u.uPulse.value[i].set(0, 0, 0, 0); }
   for (let i = 0; i < 4; i++) { const l = W.lines[i]; if (l && l.t >= 0) u.uLine.value[i].set(l.pos, l.dir, l.hw, l.t < l.tele ? 0.3 + 0.3 * (Math.floor(l.t * 12) % 2) + l.t / l.tele * 0.3 : 2.2); else u.uLine.value[i].set(0, 0, 0, 0); }
+  const rings = [];
+  for (const e of W.enemies) {
+    if (e.dead || rings.length >= 6) continue;
+    if (e.type === 'blot' && e.state === 'wind') rings.push([e.x + Math.cos(e.face) * 2.5, e.y + Math.sin(e.face) * 2.5, 0.85, 0.5 + e.t * 1.3]);
+    else if (e.type === 'scratch' && e.state === 'wind') rings.push([P.x, P.y, 0.7, 0.4 + e.t]);
+    else if (e.type === 'brute' && e.state === 'wind') rings.push([e.x + Math.cos(e.face) * 4, e.y + Math.sin(e.face) * 4, 1.3, 0.4 + e.t]);
+    else if (e.type === 'boss' && e.state === 'burst' && e.step === 0) rings.push([e.x, e.y + 0.4, 2.8, 0.5 + e.t * 1.4]);
+  }
+  for (const sl of W.slams) if (sl.set && !sl.done && rings.length < 6) rings.push([sl.x, sl.y, 1.75, 0.5 + 0.5 * sl.t / sl.dur]);
+  for (let i = 0; i < 6; i++) { const r = rings[i]; if (r) u.uRing.value[i].set(r[0], r[1], r[2], Math.min(1, r[3])); else u.uRing.value[i].set(0, 0, 0, 0); }
   for (let i = 0; i < 4; i++) { const sc = W.scars[i]; if (sc) u.uScar.value[i].set(sc.x, sc.y, sc.spin ? 99 : sc.a, 1 - sc.t / 1.5); else u.uScar.value[i].set(0, 0, 0, 0); }
   // pulling the camera back turns the lights up, so the map can be read
   const k = S.amb + zoomBright() * 0.85, a = env.amb;
@@ -704,6 +727,7 @@ function objective() {
   if (left.length) { left.sort((a, b) => dist(P.x, P.y, W.B.centers[a.i].x, W.B.centers[a.i].y) - dist(P.x, P.y, W.B.centers[b.i].x, W.B.centers[b.i].y)); const c = W.B.centers[left[0].i]; return { x: c.x, y: c.y, label: left[0].def.name }; }
   const sb = W.B.N.sB; return { x: sb.x, y: sb.y, label: 'THE BLANK' };
 }
+const labels = new Set();
 function updateOverlay() {
   const el = $('arrow'), tgt = objective(), w = innerWidth, h = innerHeight, mg = 64;
   let shown = false;
@@ -717,6 +741,26 @@ function updateOverlay() {
     }
   }
   el.style.display = shown ? 'block' : 'none';
+  // names and health over whatever is awake, like a party frame in the world
+  const near = S.zoom > 0.55 && (S.mode === 'play' || S.mode === 'dead');
+  for (const e of W.enemies) {
+    const on = near && !e.dead && e.type !== 'boss' && e.state !== 'sleep' && e.grow > 0.9;
+    if (!on) { if (e.lab) e.lab.style.display = 'none'; continue; }
+    if (!e.lab) { e.lab = document.createElement('div'); e.lab.className = 'lab'; e.lab.innerHTML = `<span>${e.type[0].toUpperCase() + e.type.slice(1)}</span><i><b></b></i>`; $('fx').appendChild(e.lab); labels.add(e); }
+    const [x, y] = R.toScreen(e.x, e.y, e.type === 'brute' ? 2.6 : e.type === 'scratch' ? 2.7 : 1.7);
+    e.lab.style.display = 'block'; e.lab.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+    e.lab.lastChild.firstChild.style.width = clamp(e.hp / e.maxHp * 100, 0, 100) + '%';
+  }
+  for (const e of labels) if (e.dead || !W.enemies.includes(e)) { e.lab.remove(); e.lab = null; labels.delete(e); }
+  const you = $('you2'), [hx, hy] = R.toScreen(P.x, P.y, 3.1);
+  you.style.display = near && P.m.g.visible ? 'block' : 'none'; you.style.transform = `translate(${hx}px, ${hy}px) translate(-50%, -100%)`;
+  const now = performance.now();
+  for (const f of floats) {
+    const age = (now - f.t) / 1000, [x, y] = R.toScreen(f.x, f.y, f.h + age * 1.8);
+    f.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${1 + Math.max(0, 0.12 - age) * 4})`; f.el.style.opacity = clamp(1.6 - age * 2, 0, 1);
+    if (age > 0.8) { f.el.remove(); f.dead = true; }
+  }
+  for (let i = floats.length - 1; i >= 0; i--) if (floats[i].dead) floats.splice(i, 1);
   // map labels once the camera is far enough back
   const far = clamp((0.36 - S.zoom) / 0.1, 0, 1), map = $('map');
   map.style.opacity = S.mode === 'play' || S.mode === 'title' ? far : 0;
