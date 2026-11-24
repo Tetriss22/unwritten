@@ -1,34 +1,41 @@
-// UNWRITTEN — everything that stands on the page is built here from primitives.
-// The ASCII pass only sees brightness and hue, so shapes are simple and bold.
+// UNWRITTEN — everything that stands on the page, built from primitives and written in letters.
+// Each part names the kind of surface it is (wall, roof, leaf, coat...), and that kind decides
+// which symbols it is drawn with and how large they are. See glyph.js.
 import * as THREE from '../lib/three.module.min.js';
+import { gmat } from './glyph.js';
 
+function prismGeo() {   // a gabled roof: ridge along z, eaves at y = 0, apex at y = 1
+  const p = [], n = [];
+  const tri = (a, b, c) => { const u = new THREE.Vector3().subVectors(b, a), v = new THREE.Vector3().subVectors(c, a), nn = u.cross(v).normalize(); for (const q of [a, b, c]) { p.push(q.x, q.y, q.z); n.push(nn.x, nn.y, nn.z); } };
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const A = V(-0.5, 0, 0.5), B = V(0.5, 0, 0.5), C = V(0, 1, 0.5), D = V(-0.5, 0, -0.5), E = V(0.5, 0, -0.5), F = V(0, 1, -0.5);
+  tri(A, B, C); tri(E, D, F);                       // gables
+  tri(B, E, F); tri(B, F, C);                       // right slope
+  tri(D, A, C); tri(D, C, F);                       // left slope
+  tri(A, D, E); tri(A, E, B);                       // underside
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3));
+  return g;
+}
 const G = {
   box: new THREE.BoxGeometry(1, 1, 1),
   sph: new THREE.SphereGeometry(0.5, 14, 10),
   cone: new THREE.ConeGeometry(0.5, 1, 12),
   cone4: new THREE.ConeGeometry(0.5, 1, 4),
-  cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
-  ico: new THREE.IcosahedronGeometry(0.5, 0),
+  cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 14),
+  ico: new THREE.IcosahedronGeometry(0.5, 1),
   oct: new THREE.OctahedronGeometry(0.5, 0),
   tet: new THREE.TetrahedronGeometry(0.5, 0),
   tor: new THREE.TorusGeometry(0.5, 0.07, 6, 20),
-  arc: new THREE.RingGeometry(0.78, 1.0, 20, 1, -1.15, 2.3),
-  ring: new THREE.RingGeometry(0.9, 1.0, 28),
-  frust: new THREE.CylinderGeometry(0.28, 0.5, 1, 12),
+  arc: new THREE.RingGeometry(0.84, 1.0, 20, 1, -1.15, 2.3),
+  ring: new THREE.RingGeometry(0.86, 1.0, 28),
+  frust: new THREE.CylinderGeometry(0.3, 0.5, 1, 14),
+  disc: new THREE.CylinderGeometry(0.5, 0.5, 0.06, 20),
+  prism: prismGeo(),
 };
-const cache = new Map();
-export function lam(hex, flat = false) {
-  const k = 'l' + hex + flat;
-  if (!cache.has(k)) cache.set(k, new THREE.MeshLambertMaterial({ color: hex, flatShading: flat }));
-  return cache.get(k);
-}
-export function glow(hex) {
-  const k = 'g' + hex;
-  if (!cache.has(k)) cache.set(k, new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.75, blending: THREE.NoBlending }));
-  return cache.get(k);
-}
-export const WHITE = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, blending: THREE.NoBlending });
-function inkMat(hex, em) { const k = 'i' + hex; if (!cache.has(k)) cache.set(k, new THREE.MeshLambertMaterial({ color: hex, emissive: em })); return cache.get(k); }
+const L = (hex, kind, flat = false) => gmat(hex, kind, { flat });
+const Gl = (hex, kind, opt = {}) => gmat(hex, kind, { glow: true, ...opt });
+export const WHITE = Gl(0xffffff, 'gold');
 
 function part(parent, geo, mat, sx, sy, sz, x = 0, y = 0, z = 0) {
   const m = new THREE.Mesh(geo, mat);
@@ -36,95 +43,97 @@ function part(parent, geo, mat, sx, sy, sz, x = 0, y = 0, z = 0) {
   return m;
 }
 
-// ---------- the Scribe: legs, long coat, pointed hood, scarf, a quill as tall as a spear, a lantern
+// ---------- the Scribe: written in the smallest, whitest letters on the page so nothing else looks like them
 export function makeHero() {
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
-  const coat = lam(0xffffff), cape = lam(0x7a66e8), dark = lam(0x5a4e98), skin = lam(0xffe0c8), scarfM = glow(0xff7fc0), gold = glow(0xffd98a);
+  const H = (hex, kind) => gmat(hex, kind, { lift: 0.55 });      // the hero is never left in the dark
+  const coat = H(0xffffff, 'coat'), cape = H(0xf2eeff, 'cape'), dark = H(0xd0c8f0, 'dark'), skin = H(0xffe6d0, 'skin');
+  const scarfM = Gl(0xff7fc0, 'scarf'), gold = Gl(0xffd98a, 'gold');
   const legs = [-1, 1].map(sd => {
-    const l = new THREE.Group(); l.position.set(sd * 0.15, 0.82, 0); body.add(l);
-    part(l, G.cyl, dark, 0.19, 0.78, 0.19, 0, -0.39, 0);
-    part(l, G.box, lam(0x2a2440), 0.22, 0.14, 0.36, 0, -0.76, 0.07);
+    const l = new THREE.Group(); l.position.set(sd * 0.15, 0.8, 0); body.add(l);
+    part(l, G.cyl, dark, 0.2, 0.78, 0.2, 0, -0.39, 0);
+    part(l, G.box, L(0x8a82b0, 'leather'), 0.23, 0.15, 0.38, 0, -0.74, 0.07);
     return l;
   });
-  part(body, G.frust, coat, 0.92, 0.95, 0.8, 0, 1.12, 0);                 // coat skirt
-  part(body, G.box, dark, 0.56, 0.1, 0.5, 0, 1.5, 0);                     // belt
-  part(body, G.frust, coat, 0.8, 0.5, 0.75, 0, 1.62, 0).rotation.x = Math.PI;   // chest
-  part(body, G.frust, cape, 0.98, 0.34, 0.86, 0, 1.76, -0.03);            // shoulder cape
-  part(body, G.box, lam(0x8a6a48), 0.26, 0.34, 0.14, -0.33, 1.12, -0.2);   // book satchel
-  const head = new THREE.Group(); head.position.set(0, 2.08, 0); body.add(head);
+  // the coat is a stack of rings; each ring trails the one above it, so the hem swings when the Scribe moves
+  const robe = [];
+  for (let i = 0; i < 6; i++) { const w = 0.6 + i * 0.085; robe.push(part(body, G.cyl, coat, w, 0.2, w * 0.88, 0, 1.52 - i * 0.17, 0)); }
+  part(body, G.frust, coat, 0.82, 0.5, 0.74, 0, 1.8, 0).rotation.x = Math.PI;      // chest
+  part(body, G.box, L(0x9088b8, 'leather'), 0.6, 0.09, 0.52, 0, 1.6, 0);          // belt
+  part(body, G.frust, cape, 1.0, 0.34, 0.9, 0, 1.94, -0.03);                      // shoulder cape
+  part(body, G.box, L(0xc8a878, 'leather'), 0.26, 0.34, 0.14, -0.36, 1.25, -0.2); // book satchel
+  const head = new THREE.Group(); head.position.set(0, 2.26, 0); body.add(head);
   part(head, G.sph, skin, 0.36, 0.38, 0.36, 0, 0, 0.05);
-  part(head, G.sph, cape, 0.44, 0.44, 0.44, 0, 0.06, -0.08);
-  part(head, G.cone, cape, 0.26, 0.7, 0.26, 0, 0.42, -0.24).rotation.x = -0.8;   // hood tip
-  part(head, G.sph, glow(0xffffff), 0.075, 0.075, 0.05, -0.085, -0.02, 0.27);
-  part(head, G.sph, glow(0xffffff), 0.075, 0.075, 0.05, 0.085, -0.02, 0.27);
+  part(head, G.sph, cape, 0.45, 0.45, 0.45, 0, 0.06, -0.08);
+  const tip = part(head, G.cone, cape, 0.26, 0.75, 0.26, 0, 0.42, -0.24); tip.rotation.x = -0.8;
+  part(head, G.sph, Gl(0xffffff, 'eye'), 0.08, 0.08, 0.05, -0.085, -0.02, 0.27);
+  part(head, G.sph, Gl(0xffffff, 'eye'), 0.08, 0.08, 0.05, 0.085, -0.02, 0.27);
   const scarf = [];
-  part(body, G.tor, scarfM, 0.6, 0.6, 1.4, 0, 1.86, 0).rotation.x = Math.PI / 2;
-  for (let i = 0; i < 4; i++) scarf.push(part(body, G.box, scarfM, 0.2 - i * 0.03, 0.09, 0.3, -0.14, 1.84, -0.34 - i * 0.26));
-  // right arm with the quill
-  const armR = new THREE.Group(); armR.position.set(0.36, 1.74, 0.02); body.add(armR);
-  part(armR, G.cyl, coat, 0.16, 0.62, 0.16, 0.06, -0.26, 0.1).rotation.x = -0.4;
-  part(armR, G.sph, skin, 0.15, 0.15, 0.15, 0.08, -0.54, 0.24);
-  const quill = new THREE.Group(); quill.position.set(0.08, -0.54, 0.24); armR.add(quill);
-  part(quill, G.cyl, glow(0xffffff), 0.055, 1.7, 0.055, 0, 0, 0.55).rotation.x = Math.PI / 2;
-  part(quill, G.cone4, gold, 0.14, 0.36, 0.07, 0, 0, 1.56).rotation.x = Math.PI / 2;
-  part(quill, G.box, glow(0xe6dcff), 0.03, 0.42, 0.8, 0, 0.17, -0.02).rotation.x = 0.2;
-  part(quill, G.box, glow(0xe6dcff), 0.03, 0.3, 0.5, 0, -0.1, -0.1).rotation.x = -0.25;
-  // left arm with the lantern
-  const armL = new THREE.Group(); armL.position.set(-0.36, 1.74, 0.02); body.add(armL);
-  part(armL, G.cyl, coat, 0.16, 0.62, 0.16, -0.06, -0.26, 0.12).rotation.x = -0.5;
-  part(armL, G.sph, skin, 0.15, 0.15, 0.15, -0.08, -0.52, 0.28);
-  const lantern = new THREE.Group(); lantern.position.set(-0.08, -0.86, 0.3); armL.add(lantern);
-  part(lantern, G.box, gold, 0.24, 0.3, 0.24);
-  part(lantern, G.cone4, lam(0x5a4a3a), 0.36, 0.16, 0.36, 0, 0.23, 0).rotation.y = Math.PI / 4;
-  part(lantern, G.cyl, lam(0x5a4a3a), 0.03, 0.22, 0.03, 0, 0.36, 0);
-  const flat = { side: THREE.DoubleSide, transparent: true, opacity: 0.75, blending: THREE.NoBlending };
-  const arc = new THREE.Mesh(G.arc, new THREE.MeshBasicMaterial({ color: 0xffffff, ...flat }));
+  part(body, G.tor, scarfM, 0.6, 0.6, 1.5, 0, 2.04, 0).rotation.x = Math.PI / 2;
+  for (let i = 0; i < 5; i++) scarf.push(part(body, G.box, scarfM, 0.2 - i * 0.025, 0.1, 0.3, -0.14, 2.02, -0.34 - i * 0.26));
+  const armR = new THREE.Group(); armR.position.set(0.38, 1.92, 0.02); body.add(armR);
+  part(armR, G.cyl, coat, 0.17, 0.62, 0.17, 0.05, -0.26, 0.1).rotation.x = -0.4;
+  part(armR, G.sph, skin, 0.15, 0.15, 0.15, 0.07, -0.54, 0.24);
+  const quill = new THREE.Group(); quill.position.set(0.07, -0.54, 0.24); armR.add(quill);
+  part(quill, G.cyl, Gl(0xffffff, 'quill'), 0.06, 1.8, 0.06, 0, 0, 0.6).rotation.x = Math.PI / 2;
+  part(quill, G.cone4, gold, 0.15, 0.4, 0.08, 0, 0, 1.68).rotation.x = Math.PI / 2;
+  part(quill, G.box, Gl(0xf0e8ff, 'quill'), 0.03, 0.46, 0.85, 0, 0.19, -0.02).rotation.x = 0.2;
+  part(quill, G.box, Gl(0xf0e8ff, 'quill'), 0.03, 0.32, 0.55, 0, -0.11, -0.1).rotation.x = -0.25;
+  const tipMark = new THREE.Object3D(); tipMark.position.set(0, 0, 1.85); quill.add(tipMark);
+  const baseMark = new THREE.Object3D(); baseMark.position.set(0, 0, 0.5); quill.add(baseMark);
+  const armL = new THREE.Group(); armL.position.set(-0.38, 1.92, 0.02); body.add(armL);
+  part(armL, G.cyl, coat, 0.17, 0.62, 0.17, -0.05, -0.26, 0.12).rotation.x = -0.5;
+  part(armL, G.sph, skin, 0.15, 0.15, 0.15, -0.07, -0.52, 0.28);
+  const lantern = new THREE.Group(); lantern.position.set(-0.07, -0.88, 0.3); armL.add(lantern);
+  part(lantern, G.box, gold, 0.26, 0.32, 0.26);
+  part(lantern, G.cone4, L(0xa89070, 'metal'), 0.38, 0.17, 0.38, 0, 0.25, 0).rotation.y = Math.PI / 4;
+  part(lantern, G.cyl, L(0xa89070, 'metal'), 0.04, 0.24, 0.04, 0, 0.38, 0);
+  const arc = new THREE.Mesh(G.arc, Gl(0xffffff, 'slash', { side: THREE.DoubleSide }));
   const arcWrap = new THREE.Group(); arcWrap.rotation.y = -Math.PI / 2; g.add(arcWrap);
-  arc.rotation.x = -Math.PI / 2; arc.position.y = 1.0; arc.visible = false; arcWrap.add(arc);
-  const spin = new THREE.Mesh(G.ring, new THREE.MeshBasicMaterial({ color: 0xfff1c9, ...flat }));
-  spin.rotation.x = -Math.PI / 2; spin.position.y = 1.0; spin.visible = false; g.add(spin);
+  arc.rotation.x = -Math.PI / 2; arc.position.y = 1.05; arc.visible = false; arcWrap.add(arc);
+  const spin = new THREE.Mesh(G.ring, Gl(0xfff1c9, 'slash', { side: THREE.DoubleSide }));
+  spin.rotation.x = -Math.PI / 2; spin.position.y = 1.05; spin.visible = false; g.add(spin);
   g.traverse(m => { if (m.isMesh) m.layers.set(m === arc || m === spin ? 2 : 3); });   // layer 3: drawn after the world, with a see-through pass
-  return { g, body, head, armR, armL, quill, lantern, scarf, arc, spin, legs };
+  return { g, body, head, tip, armR, armL, quill, lantern, scarf, arc, spin, legs, robe, tipMark, baseMark };
 }
 
-// ---------- the unwriters
+// ---------- the unwriters: heavy purple symbols, red eyes
 export function makeEnemy(type) {
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
-  const ink = inkMat(0xa88cf0, 0x2c1c50), ink2 = inkMat(0x6a50a8, 0x1c1238), eye = glow(0xff3a5a);
+  const ink = gmat(0xb890ff, 'ink', { lift: 0.3 }), ink2 = gmat(0x8a62e0, 'ink2', { lift: 0.3 }), eye = Gl(0xff3a5a, 'eye');
   const o = { g, body, type };
   if (type === 'blot') {
     part(body, G.sph, ink, 1.0, 0.86, 1.0, 0, 0.5, 0);
     part(body, G.cone, ink2, 0.24, 0.5, 0.24, -0.26, 1.0, 0).rotation.z = 0.35;
     part(body, G.cone, ink2, 0.24, 0.5, 0.24, 0.26, 1.0, 0).rotation.z = -0.35;
-    part(body, G.sph, eye, 0.2, 0.24, 0.12, -0.19, 0.6, 0.43);
-    part(body, G.sph, eye, 0.2, 0.24, 0.12, 0.19, 0.6, 0.43);
+    part(body, G.sph, eye, 0.22, 0.26, 0.12, -0.19, 0.6, 0.43);
+    part(body, G.sph, eye, 0.22, 0.26, 0.12, 0.19, 0.6, 0.43);
     for (let i = 0; i < 5; i++) part(body, G.sph, ink2, 0.3, 0.2, 0.3, Math.cos(i * 1.26) * 0.45, 0.1, Math.sin(i * 1.26) * 0.45);
   } else if (type === 'scratch') {
     part(body, G.cone, ink, 0.6, 1.5, 0.6, 0, 1.05, 0).rotation.x = Math.PI;
     part(body, G.oct, ink2, 0.5, 0.5, 0.5, 0, 1.95, 0);
-    part(body, G.sph, eye, 0.26, 0.26, 0.16, 0, 1.5, 0.24);
-    o.ring = part(body, G.tor, glow(0xc9a8ff), 1.2, 1.2, 1.2, 0, 1.25, 0); o.ring.rotation.x = Math.PI / 2;
+    part(body, G.sph, eye, 0.28, 0.28, 0.16, 0, 1.5, 0.24);
+    o.ring = part(body, G.tor, Gl(0xe0c8ff, 'ink2'), 1.2, 1.2, 1.2, 0, 1.25, 0); o.ring.rotation.x = Math.PI / 2;
   } else if (type === 'brute') {
     part(body, G.box, ink, 1.5, 1.7, 0.9, 0, 0.95, 0);
     part(body, G.box, ink2, 1.7, 0.3, 1.0, 0, 1.85, 0);
-    part(body, G.box, eye, 1.0, 0.14, 0.1, 0, 1.3, 0.48);
+    part(body, G.box, eye, 1.0, 0.16, 0.1, 0, 1.3, 0.48);
     o.armL = part(body, G.box, ink2, 0.4, 1.1, 0.5, -0.98, 0.8, 0.1);
     o.armR = part(body, G.box, ink2, 0.4, 1.1, 0.5, 0.98, 0.8, 0.1);
   } else if (type === 'boss') {
-    // THE EDITOR: a floating redaction bar with one eye, a ragged cloak and two hands
-    const bar = inkMat(0xb090ff, 0x30205a), red = glow(0xff3a5a);
+    const bar = L(0xc0a0ff, 'boss'), dk = L(0x7a5ad0, 'boss'), red = Gl(0xff3a5a, 'eye');
     o.head = new THREE.Group(); o.head.position.y = 2.7; body.add(o.head);
     part(o.head, G.box, bar, 3.6, 1.1, 1.0);
-    part(o.head, G.box, ink2, 4.0, 0.22, 1.1, 0, 0.66, 0);
-    for (let i = -3; i <= 3; i++) part(o.head, G.cone4, ink2, 0.34, 0.6 + (i % 2 ? 0.25 : 0), 0.34, i * 0.55, 1.05, 0);
+    part(o.head, G.box, dk, 4.0, 0.22, 1.1, 0, 0.66, 0);
+    for (let i = -3; i <= 3; i++) part(o.head, G.cone4, dk, 0.34, 0.6 + (i % 2 ? 0.25 : 0), 0.34, i * 0.55, 1.05, 0);
     o.eye = part(o.head, G.sph, red, 0.8, 0.62, 0.3, 0, 0, 0.5);
-    part(o.head, G.sph, glow(0xffffff), 0.26, 0.26, 0.2, 0, 0, 0.62);
-    part(body, G.cone, ink, 2.3, 2.5, 1.4, 0, 1.2, 0);
-    for (let i = 0; i < 7; i++) part(body, G.cone, ink2, 0.5, 0.9, 0.5, Math.cos(i * 0.9) * 0.95, 0.35, Math.sin(i * 0.9) * 0.55).rotation.x = Math.PI;
+    part(o.head, G.sph, Gl(0xffffff, 'eye'), 0.26, 0.26, 0.2, 0, 0, 0.62);
+    part(body, G.cone, bar, 2.3, 2.5, 1.4, 0, 1.2, 0);
+    for (let i = 0; i < 7; i++) part(body, G.cone, dk, 0.5, 0.9, 0.5, Math.cos(i * 0.9) * 0.95, 0.35, Math.sin(i * 0.9) * 0.55).rotation.x = Math.PI;
     o.hands = [-1, 1].map(s => {
       const h = new THREE.Group(); h.position.set(s * 2.6, 1.6, 0.4); g.add(h);
       part(h, G.box, bar, 1.0, 0.5, 1.2);
-      for (let i = 0; i < 4; i++) part(h, G.box, ink2, 0.2, 0.3, 0.7, -0.36 + i * 0.24, -0.05, 0.8);
+      for (let i = 0; i < 4; i++) part(h, G.box, dk, 0.2, 0.3, 0.7, -0.36 + i * 0.24, -0.05, 0.8);
       part(h, G.box, red, 0.14, 0.14, 1.9, s * -0.2, 0.3, 0.5);
       return h;
     });
@@ -145,36 +154,30 @@ function glyphSprite(text, color, size = 128) {
 }
 export function makeLetter(ch) {
   const g = new THREE.Group();
-  const lit = glyphSprite(ch, '#fff1c9'), dim = glyphSprite(ch, '#6a6490');
-  lit.scale.set(1.5, 1.5, 1); dim.scale.set(1.5, 1.5, 1); lit.position.y = dim.position.y = 1.2;
+  const lit = glyphSprite(ch, '#fff1c9'), dim = glyphSprite(ch, '#8a84b0');
+  lit.scale.set(1.7, 1.7, 1); dim.scale.set(1.7, 1.7, 1); lit.position.y = dim.position.y = 1.3;
   lit.visible = false; g.add(lit, dim);
-  const cage = part(g, G.oct, new THREE.MeshBasicMaterial({ color: 0xff3a5a, wireframe: true }), 2.0, 2.4, 2.0, 0, 1.2, 0);
+  const cage = new THREE.Group(); cage.position.y = 1.3; g.add(cage);
+  for (let i = 0; i < 3; i++) { const r = part(cage, G.tor, Gl(0xff3a5a, 'ink2'), 2.0, 2.0, 2.0); r.rotation.set(i * 1.05, i * 2.1, 0); }
   return { g, lit, dim, cage };
 }
 export function makeHeart() {
-  const c = document.createElement('canvas'); c.width = c.height = 96;
-  const x = c.getContext('2d'); x.fillStyle = '#ff6a9a';
-  x.beginPath(); x.moveTo(48, 84); x.bezierCurveTo(4, 50, 10, 12, 34, 12); x.bezierCurveTo(44, 12, 48, 22, 48, 26);
-  x.bezierCurveTo(48, 22, 52, 12, 62, 12); x.bezierCurveTo(86, 12, 92, 50, 48, 84); x.fill();
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, alphaTest: 0.4 }));
-  s.scale.set(0.8, 0.8, 1); s.position.y = 0.7; s.layers.set(2);
+  const s = glyphSprite('♥', '#ff6a9a', 96); s.scale.set(0.9, 0.9, 1); s.position.y = 0.7;
   const g = new THREE.Group(); g.add(s); return { g, s };
 }
-export function makeShot(hex = 0xff3a5a) {
+export function makeShot() {
   const g = new THREE.Group();
-  part(g, G.sph, glow(hex), 0.36, 0.36, 0.36, 0, 0.8, 0);
-  part(g, G.oct, glow(0xffffff), 0.2, 0.2, 0.2, 0, 0.8, 0);
+  part(g, G.sph, Gl(0xff3a5a, 'eye'), 0.4, 0.4, 0.4, 0, 0.8, 0);
+  part(g, G.oct, Gl(0xffffff, 'chunk'), 0.24, 0.24, 0.24, 0, 0.8, 0);
   return g;
 }
 export function makeBeacon() {
-  const g = new THREE.Group(), stone = lam(0xa8a4c0, true);
+  const g = new THREE.Group(), stone = L(0xd8d4f0, 'stone', true);
   part(g, G.cyl, stone, 2.0, 0.26, 2.0, 0, 0.13, 0);
   part(g, G.cyl, stone, 1.4, 0.26, 1.4, 0, 0.39, 0);
-  for (let i = 0; i < 4; i++) part(g, G.cyl, stone, 0.12, 1.7, 0.12, Math.cos(i * 1.571 + 0.785) * 0.55, 1.35, Math.sin(i * 1.571 + 0.785) * 0.55);
-  part(g, G.cone4, stone, 1.5, 0.6, 1.5, 0, 2.5, 0).rotation.y = Math.PI / 4;
-  part(g, G.sph, stone, 0.2, 0.2, 0.2, 0, 2.9, 0);
-  const coreMat = new THREE.MeshBasicMaterial({ color: 0x3a3650, transparent: true, opacity: 0.75, blending: THREE.NoBlending });
+  for (let i = 0; i < 4; i++) part(g, G.cyl, L(0xb8b4d8, 'metal'), 0.13, 1.7, 0.13, Math.cos(i * 1.571 + 0.785) * 0.55, 1.35, Math.sin(i * 1.571 + 0.785) * 0.55);
+  part(g, G.cone4, L(0xb8b4d8, 'roof', true), 1.5, 0.6, 1.5, 0, 2.5, 0).rotation.y = Math.PI / 4;
+  const coreMat = gmat(0x55507a, 'gold', { glow: true, own: true });
   const core = part(g, G.oct, coreMat, 0.6, 1.0, 0.6, 0, 1.4, 0);
   return { g, core, coreMat };
 }
@@ -183,148 +186,158 @@ export function makeBeacon() {
 export function makeProp(p) {
   const g = new THREE.Group(), s = p.s, v = p.v;
   const add = (geo, mat, sx, sy, sz, x = 0, y = 0, z = 0) => part(g, geo, mat, sx * s, sy * s, sz * s, x * s, y * s, z * s);
+  const WIN = Gl(0xffb040, 'window');
   switch (p.type) {
     case 'house': case 'cabin': {
       const snow = p.type === 'cabin';
-      const wall = lam(snow ? 0xb08a68 : 0xffffff, true), roof = lam(snow ? 0xffffff : [0x6a58e0, 0xe0508a, 0x4a70e8][Math.floor(v * 7) % 3], true), win = glow(0xffb040);
-      const w = 2.7, d = 2.1, h = 1.7;
+      const wall = L(snow ? 0xd8b088 : [0xffffff, 0xfff0e0, 0xf0e8ff][Math.floor(v * 3)], snow ? 'wood' : 'wall', true);
+      const roof = L(snow ? 0xffffff : [0x8a78ff, 0xff6aa0, 0x6a9aff][Math.floor(v * 7) % 3], snow ? 'snow' : 'roof', true), frame = L(0xc8b090, 'wood');
+      const w = 3.0, d = 2.3, h = 1.8;
       add(G.box, wall, w, h, d, 0, h / 2, 0);
-      const rf = new THREE.Group(); rf.scale.set((w + 0.5) / 0.707 * s, 1.35 * s, (d + 0.5) / 0.707 * s); rf.position.y = (h + 0.67) * s; g.add(rf);
-      part(rf, G.cone4, roof, 1, 1, 1).rotation.y = Math.PI / 4;
-      add(G.box, lam(0x4a3a50), 0.55, 1.0, 0.08, 0.55, 0.5, d / 2 + 0.03);
-      add(G.box, win, 0.62, 0.7, 0.07, -0.65, 1.0, d / 2 + 0.03); add(G.box, win, 0.07, 0.7, 0.62, w / 2 + 0.03, 1.0, 0.2); add(G.box, win, 0.07, 0.7, 0.62, -w / 2 - 0.03, 1.0, -0.2);
-      add(G.box, wall, 0.34, 0.9, 0.34, 0.75, h + 0.95, -0.2);
-      if (snow) add(G.box, lam(0xffffff, true), 0.44, 0.14, 0.44, 0.75, h + 1.45, -0.2);
+      add(G.prism, roof, w + 0.5, 1.35, d + 0.6, 0, h, 0).rotation.y = Math.PI / 2;
+      add(G.box, wall, w, 0.06, d, 0, h + 0.02, 0);
+      add(G.box, L(0x9a7a60, 'door'), 0.6, 1.1, 0.1, 0.65, 0.55, d / 2 + 0.04);
+      for (const [x, z, rx] of [[-0.65, d / 2 + 0.04, 0], [w / 2 + 0.04, 0.2, 1], [-w / 2 - 0.04, -0.2, 1]]) {
+        add(G.box, WIN, rx ? 0.08 : 0.66, 0.72, rx ? 0.66 : 0.08, x, 1.05, z);
+        add(G.box, frame, rx ? 0.1 : 0.8, 0.1, rx ? 0.8 : 0.1, x, 1.46, z); add(G.box, frame, rx ? 0.1 : 0.8, 0.1, rx ? 0.8 : 0.1, x, 0.64, z);
+      }
+      add(G.box, L(0xd0c0b0, 'brick', true), 0.4, 1.3, 0.4, -0.8, h + 0.75, -0.3);
+      add(G.cyl, frame, 0.12, 1.0, 0.12, 1.2, 0.5, d / 2 + 0.7); add(G.cyl, frame, 0.12, 1.0, 0.12, 0.1, 0.5, d / 2 + 0.7); add(G.box, roof, 1.5, 0.08, 0.8, 0.65, 1.02, d / 2 + 0.4);
       g.rotation.y = p.rot; break;
     }
     case 'tower': case 'watchtower': {
-      const st = lam(p.type === 'watchtower' ? 0x9a8a78 : 0xc8c4e0, true), hgt = 3.6 + v * 1.4;
+      const st = L(p.type === 'watchtower' ? 0xd8c0a0 : 0xe8e4ff, p.type === 'watchtower' ? 'wood' : 'brick', true), hgt = 3.8 + v * 1.4;
       if (p.type === 'watchtower') {
-        for (const [x, z] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) add(G.cyl, st, 0.14, hgt, 0.14, x, hgt / 2, z);
+        for (const [x, z] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) add(G.cyl, st, 0.16, hgt, 0.16, x, hgt / 2, z);
         add(G.box, st, 1.7, 0.16, 1.7, 0, hgt, 0); add(G.box, st, 1.7, 0.5, 0.1, 0, hgt + 0.3, 0.8); add(G.box, st, 0.1, 0.5, 1.7, 0.8, hgt + 0.3, 0);
-        add(G.cone4, lam(0xffffff, true), 2.8, 0.9, 2.8, 0, hgt + 1.4, 0).rotation.y = Math.PI / 4; add(G.box, glow(0xffc070), 0.3, 0.4, 0.3, 0, hgt + 0.4, 0);
+        add(G.cone4, L(0xffffff, 'snow', true), 2.8, 0.9, 2.8, 0, hgt + 1.4, 0).rotation.y = Math.PI / 4; add(G.box, WIN, 0.34, 0.44, 0.34, 0, hgt + 0.4, 0);
       } else {
-        add(G.cyl, st, 1.7, hgt, 1.7, 0, hgt / 2, 0); add(G.cyl, st, 2.1, 0.3, 2.1, 0, hgt + 0.15, 0);
-        for (let i = 0; i < 8; i++) add(G.box, st, 0.36, 0.4, 0.36, Math.cos(i * 0.785) * 0.9, hgt + 0.5, Math.sin(i * 0.785) * 0.9);
-        for (let i = 0; i < 3; i++) add(G.box, glow(0xffc070), 0.26, 0.5, 0.1, Math.sin(i * 1.1 - 0.6) * 0.82, 1.2 + i * 1.0, Math.cos(i * 1.1 - 0.6) * 0.82).rotation.y = i * 1.1 - 0.6;
-        add(G.box, lam(0x4a3a50), 0.6, 1.0, 0.1, 0, 0.5, 0.86);
+        add(G.cyl, st, 1.8, hgt, 1.8, 0, hgt / 2, 0); add(G.cyl, L(0xc8c4e8, 'stone', true), 2.2, 0.3, 2.2, 0, hgt + 0.15, 0);
+        for (let i = 0; i < 8; i++) add(G.box, st, 0.4, 0.42, 0.4, Math.cos(i * 0.785) * 0.95, hgt + 0.5, Math.sin(i * 0.785) * 0.95);
+        for (let i = 0; i < 3; i++) add(G.box, WIN, 0.3, 0.56, 0.12, Math.sin(i * 1.1 - 0.6) * 0.87, 1.2 + i * 1.05, Math.cos(i * 1.1 - 0.6) * 0.87).rotation.y = i * 1.1 - 0.6;
+        add(G.box, L(0x9a7a60, 'door'), 0.6, 1.1, 0.1, 0, 0.55, 0.9);
       }
       g.rotation.y = p.rot; break;
     }
     case 'windmill': {
-      const st = lam(0xe6d8c8, true);
-      add(G.frust, st, 2.4, 3.4, 2.4, 0, 1.7, 0); add(G.cone, lam(0xe07aa0, true), 1.7, 1.0, 1.7, 0, 3.9, 0);
-      add(G.box, glow(0xffc070), 0.4, 0.5, 0.1, 0, 1.3, 1.0); add(G.box, lam(0x4a3a50), 0.5, 0.9, 0.1, 0.0, 0.45, 1.2);
-      const hub = new THREE.Group(); hub.position.set(0, 3.5 * s, 0.95 * s); hub.userData.spin = 0.9; g.add(hub);
-      for (let i = 0; i < 4; i++) { const b = new THREE.Group(); b.rotation.z = i * Math.PI / 2; hub.add(b); part(b, G.box, lam(0xffffff), 0.5 * s, 2.3 * s, 0.06 * s, 0, 1.3 * s, 0); part(b, G.box, lam(0x8a7a90), 0.08 * s, 2.6 * s, 0.08 * s, 0, 1.3 * s, -0.05 * s); }
+      add(G.frust, L(0xffffff, 'wall', true), 2.5, 3.5, 2.5, 0, 1.75, 0); add(G.cone, L(0xff6aa0, 'roof', true), 1.8, 1.1, 1.8, 0, 4.05, 0);
+      add(G.box, WIN, 0.42, 0.54, 0.1, 0, 1.4, 1.02); add(G.box, L(0x9a7a60, 'door'), 0.56, 1.0, 0.1, 0, 0.5, 1.24);
+      const hub = new THREE.Group(); hub.position.set(0, 3.6 * s, 1.0 * s); hub.userData.spin = 0.9; g.add(hub);
+      for (let i = 0; i < 4; i++) { const b = new THREE.Group(); b.rotation.z = i * Math.PI / 2; hub.add(b); part(b, G.box, L(0xffffff, 'hay'), 0.56 * s, 2.4 * s, 0.06 * s, 0, 1.35 * s, 0); part(b, G.box, L(0xc8b090, 'wood'), 0.09 * s, 2.7 * s, 0.09 * s, 0, 1.35 * s, -0.06 * s); }
       g.rotation.y = p.rot; break;
     }
     case 'ruinwall': {
-      const st = lam(0xbfc8d8, true), win = glow(0xffd890);
+      const st = L(0xd8e0f0, 'brick', true), win = Gl(0xffd890, 'window');
       add(G.box, st, 5.0, 0.5, 0.7, 0, 0.25, 0);
       for (let i = 0; i < 4; i++) add(G.box, st, 0.5, 3.6 - (i === 3 ? v * 1.6 : 0), 0.8, -2.25 + i * 1.5, 1.8 - (i === 3 ? v * 0.8 : 0), 0);
       for (let i = 0; i < 3; i++) {
         if (i === 2 && v > 0.6) continue;
         add(G.box, st, 1.0, 0.6, 0.6, -1.5 + i * 1.5, 3.3, 0);
         add(G.box, win, 0.8, 1.9, 0.2, -1.5 + i * 1.5, 1.6, 0); add(G.cyl, win, 0.8, 0.2, 0.8, -1.5 + i * 1.5, 2.55, 0).rotation.x = Math.PI / 2;
-        add(G.box, st, 0.08, 1.9, 0.26, -1.5 + i * 1.5, 1.6, 0); add(G.box, st, 0.8, 0.08, 0.26, -1.5 + i * 1.5, 1.7, 0);
+        add(G.box, st, 0.09, 1.9, 0.26, -1.5 + i * 1.5, 1.6, 0); add(G.box, st, 0.8, 0.09, 0.26, -1.5 + i * 1.5, 1.7, 0);
       }
       g.rotation.y = p.rot; break;
     }
     case 'burnt': {
-      const w = lam(0xa07868, true), ch = lam(0x4a3838, true);
+      const w = L(0xe0a890, 'brick', true), ch = L(0x9a7a70, 'wood', true);
       add(G.box, w, 2.8, 1.6 + v, 0.3, 0, (1.6 + v) / 2, -1.0); add(G.box, w, 0.3, 1.2, 2.0, -1.4, 0.6, 0); add(G.box, w, 0.3, 0.7 + v, 1.2, 1.4, 0.4, -0.4);
-      add(G.box, glow(0xff8a3a), 0.5, 0.6, 0.34, -0.5, 1.0, -1.0); add(G.box, glow(0xff8a3a), 0.34, 0.5, 0.5, -1.4, 0.75, 0.2);
-      add(G.box, ch, 0.14, 0.14, 2.6, 0.3, 1.5, 0).rotation.x = 0.5; add(G.box, ch, 2.4, 0.14, 0.14, 0, 0.9, 0.3).rotation.z = -0.35;
+      add(G.box, Gl(0xff8a3a, 'window'), 0.5, 0.6, 0.34, -0.5, 1.0, -1.0); add(G.box, Gl(0xff8a3a, 'window'), 0.34, 0.5, 0.5, -1.4, 0.75, 0.2);
+      add(G.box, ch, 0.16, 0.16, 2.6, 0.3, 1.5, 0).rotation.x = 0.5; add(G.box, ch, 2.4, 0.16, 0.16, 0, 0.9, 0.3).rotation.z = -0.35;
       add(G.box, w, 0.5, 2.6, 0.5, 1.1, 1.3, -1.0);
-      const f = add(G.cone, glow(0xffb050), 0.5, 0.9, 0.5, 0.2, 0.45, 0.2); f.userData.flame = true;
+      const f = add(G.cone, Gl(0xffb050, 'fire'), 0.5, 0.9, 0.5, 0.2, 0.45, 0.2); f.userData.flame = true;
       g.rotation.y = p.rot; break;
     }
     case 'doorframe': {
-      const wt = lam(0xf0e8ff, true), m = new THREE.Group(); m.userData.float = v * 6 + 0.1; m.position.y = 0.4 * s; g.add(m);
+      const wt = L(0xf6f0ff, 'voidstone', true), m = new THREE.Group(); m.userData.float = v * 6 + 0.1; m.position.y = 0.4 * s; g.add(m);
       part(m, G.box, wt, 0.3 * s, 3.2 * s, 0.3 * s, -0.9 * s, 1.6 * s, 0); part(m, G.box, wt, 0.3 * s, 3.2 * s, 0.3 * s, 0.9 * s, 1.6 * s, 0); part(m, G.box, wt, 2.4 * s, 0.3 * s, 0.4 * s, 0, 3.3 * s, 0);
-      part(m, G.box, glow(0xc9b8ff), 1.5 * s, 3.0 * s, 0.06 * s, 0, 1.6 * s, 0);
-      g.rotation.y = p.rot; break;
-    }
-    case 'cypress': { const lf = lam(v > 0.5 ? 0x7f93f0 : 0x9a86e8, true); add(G.cyl, lam(0x5a5078), 0.24, 0.8, 0.24, 0, 0.4, 0); add(G.cone, lf, 1.3, 3.2, 1.3, 0, 2.2, 0); add(G.cone, lf, 1.0, 2.2, 1.0, 0, 3.4, 0); break; }
-    case 'hay': add(G.cyl, lam(0xffd9a0, true), 1.0, 0.7, 1.0, 0, 0.35, 0); add(G.sph, lam(0xffe9b8, true), 1.05, 0.7, 1.05, 0, 0.72, 0); break;
-    case 'fence': {
-      const w = lam(0xd8c8a8);
-      add(G.cyl, w, 0.12, 0.85, 0.12, 0, 0.42, -0.8); add(G.box, w, 0.07, 0.08, 1.6, 0, 0.7, 0); add(G.box, w, 0.07, 0.08, 1.6, 0, 0.4, 0);
-      if (v > 0.8) add(G.box, glow(0xffe2a0), 0.16, 0.2, 0.16, 0, 0.98, -0.8);
+      part(m, G.box, Gl(0xc9b8ff, 'book'), 1.5 * s, 3.0 * s, 0.06 * s, 0, 1.6 * s, 0);
       g.rotation.y = p.rot; break;
     }
     case 'tree': {
-      const leaf = [0x93a8ff, 0xf3a0c8, 0xb7a6ff, 0x7f93f0][Math.floor(v * 4)];
-      add(G.cyl, lam(0x5a5078), 0.28, 1.3, 0.28, 0, 0.65, 0);
-      add(G.ico, lam(leaf, true), 1.8, 1.5, 1.8, 0, 1.9, 0);
-      add(G.ico, lam(leaf, true), 1.2, 1.1, 1.2, 0.5, 2.5, 0.2).rotation.y = v * 6;
-      add(G.ico, lam(leaf, true), 1.1, 0.9, 1.1, -0.55, 2.35, -0.2).rotation.y = v * 3;
+      const leaf = L([0xa8b8ff, 0xffa8d0, 0xc8b8ff, 0x8fa8ff][Math.floor(v * 4)], 'leaf', true);
+      add(G.cyl, L(0xb8a0c0, 'trunk'), 0.3, 1.5, 0.3, 0, 0.75, 0);
+      add(G.ico, leaf, 1.9, 1.6, 1.9, 0, 2.1, 0); add(G.ico, leaf, 1.3, 1.2, 1.3, 0.55, 2.75, 0.2); add(G.ico, leaf, 1.2, 1.0, 1.2, -0.6, 2.55, -0.2);
       break;
     }
-    case 'bush': add(G.ico, lam(v > 0.5 ? 0x8ea2ff : 0xf3a0c8, true), 1.0, 0.7, 1.0, 0, 0.35, 0); add(G.ico, lam(0xb7a6ff, true), 0.7, 0.55, 0.7, 0.4, 0.3, 0.2); break;
-    case 'rock': add(G.ico, lam(0x9a98b0, true), 0.9, 0.6, 0.8, 0, 0.26, 0).rotation.y = p.rot; break;
-    case 'stone': add(G.box, lam(0xb0aec8, true), 0.55, 1.5, 0.3, 0, 0.75, 0).rotation.y = p.rot * 0.2; add(G.box, lam(0x8a88a8, true), 0.75, 0.2, 0.45, 0, 0.1, 0); break;
-    case 'boulder': add(G.ico, lam(0x8fa0c0, true), 1.5, 1.2, 1.4, 0, 0.5, 0).rotation.y = p.rot; add(G.ico, lam(0xf0f6ff, true), 1.2, 0.5, 1.1, 0, 1.0, 0); break;
-    case 'lamp': {
-      add(G.cyl, lam(0x8880a8), 0.1, 2.0, 0.1, 0, 1.0, 0);
-      add(G.box, lam(0x8880a8), 0.5, 0.06, 0.06, 0.2, 2.0, 0);
-      add(G.box, glow(0xffe2a0), 0.26, 0.34, 0.26, 0.4, 1.74, 0);
-      add(G.cone4, lam(0x6a6088), 0.44, 0.18, 0.44, 0.4, 1.99, 0).rotation.y = 0.785;
-      break;
-    }
-    case 'brazier': {
-      add(G.cyl, lam(0x7a6a68), 0.14, 0.9, 0.14, 0, 0.45, 0);
-      add(G.cone, lam(0x7a6a68), 0.7, 0.4, 0.7, 0, 1.0, 0).rotation.x = Math.PI;
-      const f = add(G.cone, glow(0xffb050), 0.42, 0.8, 0.42, 0, 1.55, 0); f.userData.flame = true;
-      add(G.cone, glow(0xfff0b0), 0.2, 0.44, 0.2, 0, 1.42, 0);
-      break;
-    }
-    case 'flame': { const f = add(G.cone, glow(0xff6a2a), 0.9, 2.2, 0.9, 0, 1.1, 0); f.userData.flame = true; add(G.cone, glow(0xffd27a), 0.5, 1.2, 0.5, 0, 0.6, 0); break; }
-    case 'post': add(G.cyl, lam(0xc8b090), 0.16, 1.0, 0.16, 0, 0.5, 0); add(G.box, lam(0xc8b090), 0.24, 0.1, 0.24, 0, 1.02, 0); break;
-    case 'reed': for (let i = 0; i < 5; i++) { const a = i * 1.3 + v * 6; add(G.cyl, lam(i % 2 ? 0x7fe0c0 : 0xa8f0a0), 0.05, 1.0 + (i % 3) * 0.4, 0.05, Math.cos(a) * 0.25, 0.6 + (i % 3) * 0.2, Math.sin(a) * 0.25).rotation.z = Math.cos(a) * 0.15; } break;
-    case 'shelf': {
-      const wood = lam(0x8a7a60, true);
-      const sh = new THREE.Group(); sh.rotation.y = p.rot * 0.12 - 0.3; sh.rotation.z = (v - 0.5) * 0.2; g.add(sh);
-      part(sh, G.box, wood, 1.7 * s, 2.3 * s, 0.5 * s, 0, 1.15 * s, 0);
-      for (let r = 0; r < 3; r++) for (let b = 0; b < 5; b++) if ((r * 5 + b + Math.floor(v * 9)) % 4)
-        part(sh, G.box, glow([0xffe9a8, 0x7ff0d8, 0xffc86b, 0xe6f2d8][(r + b) % 4]), 0.2 * s, 0.5 * s, 0.1 * s, (-0.6 + b * 0.3) * s, (0.45 + r * 0.7) * s, 0.26 * s);
-      break;
-    }
-    case 'column': {
-      const st = lam(0xc0bcd8, true), hgt = 1.2 + v * 2.2;
-      add(G.cyl, st, 0.9, 0.24, 0.9, 0, 0.12, 0); add(G.cyl, st, 0.56, hgt, 0.56, 0, 0.24 + hgt / 2, 0);
-      if (v > 0.5) add(G.box, st, 1.0, 0.24, 1.0, 0, 0.36 + hgt, 0); else add(G.ico, st, 0.6, 0.4, 0.6, 0.1, 0.3 + hgt, 0);
+    case 'cypress': { const lf = L(v > 0.5 ? 0x9aaaff : 0xb8a0ff, 'needle', true); add(G.cyl, L(0xb8a0c0, 'trunk'), 0.24, 0.8, 0.24, 0, 0.4, 0); add(G.cone, lf, 1.3, 3.2, 1.3, 0, 2.2, 0); add(G.cone, lf, 1.0, 2.2, 1.0, 0, 3.4, 0); break; }
+    case 'pine': {
+      add(G.cyl, L(0xb0a0b8, 'trunk'), 0.26, 1.0, 0.26, 0, 0.5, 0);
+      for (let i = 0; i < 3; i++) { add(G.cone, L(0xa8c0f0, 'needle', true), 1.9 - i * 0.45, 1.2, 1.9 - i * 0.45, 0, 1.3 + i * 0.8, 0); add(G.cone, L(0xffffff, 'snow', true), 1.35 - i * 0.36, 0.5, 1.35 - i * 0.36, 0, 1.78 + i * 0.8, 0); }
       break;
     }
     case 'deadtree': {
-      const w = lam(0x8a6a60);
-      add(G.cyl, w, 0.26, 2.4, 0.26, 0, 1.2, 0).rotation.z = (v - 0.5) * 0.3;
-      add(G.cyl, w, 0.12, 1.2, 0.12, 0.4, 2.2, 0).rotation.z = -0.9;
-      add(G.cyl, w, 0.1, 1.0, 0.1, -0.36, 1.8, 0.1).rotation.z = 1.0;
-      add(G.cyl, w, 0.08, 0.7, 0.08, 0.1, 2.7, 0.2).rotation.x = 0.7;
+      const w = L(0xc09a88, 'trunk');
+      add(G.cyl, w, 0.28, 2.4, 0.28, 0, 1.2, 0).rotation.z = (v - 0.5) * 0.3;
+      add(G.cyl, w, 0.14, 1.2, 0.14, 0.4, 2.2, 0).rotation.z = -0.9; add(G.cyl, w, 0.12, 1.0, 0.12, -0.36, 1.8, 0.1).rotation.z = 1.0; add(G.cyl, w, 0.1, 0.7, 0.1, 0.1, 2.7, 0.2).rotation.x = 0.7;
+      break;
+    }
+    case 'bush': add(G.ico, L(v > 0.5 ? 0xa8b8ff : 0xffa8d0, 'leaf', true), 1.0, 0.7, 1.0, 0, 0.35, 0); add(G.ico, L(0xc8b8ff, 'leaf', true), 0.7, 0.55, 0.7, 0.4, 0.3, 0.2); break;
+    case 'reed': for (let i = 0; i < 5; i++) { const a = i * 1.3 + v * 6; add(G.cyl, L(i % 2 ? 0x8af0d8 : 0xc4f8bc, 'reed'), 0.07, 1.0 + (i % 3) * 0.4, 0.07, Math.cos(a) * 0.25, 0.6 + (i % 3) * 0.2, Math.sin(a) * 0.25).rotation.z = Math.cos(a) * 0.15; } break;
+    case 'rock': add(G.ico, L(0xd0cce8, 'stone', true), 0.9, 0.6, 0.8, 0, 0.26, 0).rotation.y = p.rot; break;
+    case 'stone': add(G.box, L(0xe0dcf8, 'stone', true), 0.6, 1.5, 0.32, 0, 0.75, 0).rotation.y = p.rot * 0.2; add(G.box, L(0xc0bcd8, 'stone', true), 0.8, 0.2, 0.5, 0, 0.1, 0); break;
+    case 'boulder': add(G.ico, L(0xc0d0e8, 'stone', true), 1.5, 1.2, 1.4, 0, 0.5, 0).rotation.y = p.rot; add(G.ico, L(0xffffff, 'snow', true), 1.2, 0.5, 1.1, 0, 1.0, 0); break;
+    case 'lamp': {
+      add(G.cyl, L(0xc8c0e8, 'metal'), 0.11, 2.0, 0.11, 0, 1.0, 0); add(G.box, L(0xc8c0e8, 'metal'), 0.5, 0.07, 0.07, 0.2, 2.0, 0);
+      add(G.box, Gl(0xffe2a0, 'lamp'), 0.3, 0.38, 0.3, 0.4, 1.74, 0); add(G.cone4, L(0xa8a0c8, 'metal'), 0.48, 0.2, 0.48, 0.4, 2.02, 0).rotation.y = 0.785;
+      break;
+    }
+    case 'brazier': {
+      add(G.cyl, L(0xc0a8a0, 'metal'), 0.15, 0.9, 0.15, 0, 0.45, 0); add(G.cone, L(0xc0a8a0, 'metal'), 0.7, 0.4, 0.7, 0, 1.0, 0).rotation.x = Math.PI;
+      const f = add(G.cone, Gl(0xffb050, 'fire'), 0.44, 0.85, 0.44, 0, 1.55, 0); f.userData.flame = true;
+      break;
+    }
+    case 'flame': { const f = add(G.cone, Gl(0xff6a2a, 'fire'), 0.9, 2.2, 0.9, 0, 1.1, 0); f.userData.flame = true; add(G.cone, Gl(0xffd27a, 'fire'), 0.5, 1.2, 0.5, 0, 0.6, 0); break; }
+    case 'shelf': {
+      const sh = new THREE.Group(); sh.rotation.y = p.rot * 0.12 - 0.3; sh.rotation.z = (v - 0.5) * 0.2; g.add(sh);
+      part(sh, G.box, L(0xd0b890, 'wood', true), 1.7 * s, 2.3 * s, 0.5 * s, 0, 1.15 * s, 0);
+      for (let r = 0; r < 3; r++) part(sh, G.box, Gl([0xffe9a8, 0x8af0d8, 0xffc86b][r], 'book'), 1.4 * s, 0.46 * s, 0.1 * s, 0, (0.45 + r * 0.7) * s, 0.26 * s);
+      break;
+    }
+    case 'column': {
+      const st = L(0xe8e4ff, 'stone', true), hgt = 1.2 + v * 2.2;
+      add(G.cyl, st, 0.9, 0.24, 0.9, 0, 0.12, 0); add(G.cyl, L(0xe8e4ff, 'trunk'), 0.56, hgt, 0.56, 0, 0.24 + hgt / 2, 0);
+      if (v > 0.5) add(G.box, st, 1.0, 0.24, 1.0, 0, 0.36 + hgt, 0); else add(G.ico, st, 0.6, 0.4, 0.6, 0.1, 0.3 + hgt, 0);
       break;
     }
     case 'wall': {
-      const w = lam(0xa07868, true), hgt = 1.4 + v * 1.6, wd = 1.6 + v;
-      const wl = new THREE.Group(); wl.rotation.y = Math.round(p.rot) * 0.4; g.add(wl);
-      part(wl, G.box, w, wd * s, hgt * s, 0.4 * s, 0, hgt * s / 2, 0);
-      part(wl, G.box, w, 0.5 * s, 0.6 * s, 0.4 * s, -wd * s / 2 + 0.25 * s, (hgt + 0.3) * s, 0);
-      if (v > 0.35) part(wl, G.box, glow(0xff8a3a), 0.4 * s, 0.5 * s, 0.1 * s, 0.2 * s, hgt * s * 0.55, 0.2 * s);
+      const hgt = 1.4 + v * 1.6, wd = 1.6 + v, wl = new THREE.Group(); wl.rotation.y = Math.round(p.rot) * 0.4; g.add(wl);
+      part(wl, G.box, L(0xe0a890, 'brick', true), wd * s, hgt * s, 0.4 * s, 0, hgt * s / 2, 0);
+      part(wl, G.box, L(0xe0a890, 'brick', true), 0.5 * s, 0.6 * s, 0.4 * s, -wd * s / 2 + 0.25 * s, (hgt + 0.3) * s, 0);
+      if (v > 0.35) part(wl, G.box, Gl(0xff8a3a, 'window'), 0.44 * s, 0.54 * s, 0.12 * s, 0.2 * s, hgt * s * 0.55, 0.2 * s);
       break;
     }
-    case 'pine': {
-      add(G.cyl, lam(0x6a6078), 0.24, 1.0, 0.24, 0, 0.5, 0);
-      for (let i = 0; i < 3; i++) { add(G.cone, lam(0x7f98c8, true), 1.8 - i * 0.45, 1.2, 1.8 - i * 0.45, 0, 1.3 + i * 0.8, 0); add(G.cone, lam(0xffffff, true), 1.3 - i * 0.36, 0.5, 1.3 - i * 0.36, 0, 1.75 + i * 0.8, 0); }
-      break;
+    case 'spike': { const m = add(G.cone4, L(0xd0f4ff, 'ice', true), 0.6, 2.2, 0.6, 0, 1.1, 0); m.rotation.z = (v - 0.5) * 0.5; add(G.cone4, L(0xb0f0ff, 'ice', true), 0.3, 1.2, 0.3, 0.3, 0.6, 0.2).rotation.z = -0.4; break; }
+    case 'shard': { const m = add(G.oct, L(0xdcd0ff, 'voidstone', true), 0.7, 1.6, 0.7, 0, 1.6 + v, 0); m.userData.float = v * 6 + 0.1; m.rotation.y = p.rot; break; }
+    case 'cube': { const m = add(G.box, L(0xf0e8ff, 'voidstone', true), 0.7, 0.7, 0.7, 0, 0.9 + v * 1.2, 0); m.userData.float = v * 6 + 0.1; m.rotation.set(v * 3, p.rot, v); break; }
+    case 'hay': add(G.cyl, L(0xffd9a0, 'hay', true), 1.0, 0.7, 1.0, 0, 0.35, 0); add(G.sph, L(0xffe9b8, 'hay', true), 1.05, 0.7, 1.05, 0, 0.72, 0); break;
+    case 'fence': {
+      const w = L(0xf0e0c0, 'wood');
+      add(G.cyl, w, 0.14, 0.9, 0.14, 0, 0.45, -0.8); add(G.box, w, 0.1, 0.12, 1.6, 0, 0.72, 0); add(G.box, w, 0.1, 0.12, 1.6, 0, 0.4, 0);
+      if (v > 0.8) add(G.box, Gl(0xffe2a0, 'lamp'), 0.18, 0.22, 0.18, 0, 1.02, -0.8);
+      g.rotation.y = p.rot; break;
     }
-    case 'spike': { const m = add(G.cone4, lam(0xbff0ff, true), 0.6, 2.2, 0.6, 0, 1.1, 0); m.rotation.z = (v - 0.5) * 0.5; add(G.cone4, glow(0x9fe8ff), 0.3, 1.2, 0.3, 0.3, 0.6, 0.2).rotation.z = -0.4; break; }
-    case 'shard': { const m = add(G.oct, lam(0xc9b8ff, true), 0.7, 1.6, 0.7, 0, 1.6 + v, 0); m.userData.float = v * 6 + 0.1; m.rotation.y = p.rot; break; }
-    case 'cube': { const m = add(G.box, lam(0xe0d8ff, true), 0.7, 0.7, 0.7, 0, 0.9 + v * 1.2, 0); m.userData.float = v * 6 + 0.1; m.rotation.set(v * 3, p.rot, v); break; }
+    case 'well': {
+      add(G.cyl, L(0xe0dcf8, 'brick', true), 1.3, 0.7, 1.3, 0, 0.35, 0); add(G.cyl, L(0x5a8aff, 'ice'), 1.0, 0.06, 1.0, 0, 0.7, 0);
+      add(G.cyl, L(0xd0b890, 'wood'), 0.12, 1.5, 0.12, -0.6, 0.95, 0); add(G.cyl, L(0xd0b890, 'wood'), 0.12, 1.5, 0.12, 0.6, 0.95, 0);
+      add(G.prism, L(0xff6aa0, 'roof', true), 1.7, 0.5, 1.1, 0, 1.7, 0); break;
+    }
+    case 'crates': {
+      const w = L(0xe0c8a0, 'wood', true);
+      add(G.box, w, 0.7, 0.7, 0.7, 0, 0.35, 0).rotation.y = v; add(G.box, w, 0.6, 0.6, 0.6, 0.75, 0.3, 0.2).rotation.y = v * 2; add(G.box, w, 0.55, 0.55, 0.55, 0.2, 0.98, 0.05).rotation.y = v * 3;
+      add(G.cyl, L(0xc8a878, 'wood'), 0.56, 0.8, 0.56, -0.7, 0.4, 0.3); break;
+    }
+    case 'cart': {
+      const w = L(0xe0c8a0, 'wood', true);
+      add(G.box, w, 1.8, 0.5, 1.0, 0, 0.75, 0); add(G.box, L(0xffd9a0, 'hay', true), 1.6, 0.4, 0.85, 0, 1.15, 0);
+      for (const [x, z] of [[-0.6, 0.55], [0.6, 0.55], [-0.6, -0.55], [0.6, -0.55]]) add(G.disc, L(0xc8a878, 'wood'), 0.7, 1.4, 0.7, x, 0.36, z).rotation.x = Math.PI / 2;
+      add(G.box, w, 1.3, 0.08, 0.08, 1.5, 0.7, 0.3); add(G.box, w, 1.3, 0.08, 0.08, 1.5, 0.7, -0.3);
+      g.rotation.y = p.rot; break;
+    }
+    case 'sign': { const w = L(0xf0e0c0, 'wood'); add(G.cyl, w, 0.12, 1.6, 0.12, 0, 0.8, 0); add(G.box, w, 1.1, 0.34, 0.08, 0.2, 1.45, 0).rotation.y = 0.3; add(G.box, w, 0.9, 0.3, 0.08, -0.15, 1.05, 0).rotation.y = -0.5; g.rotation.y = p.rot; break; }
   }
   return g;
 }
-export function makeChunk(hex) { return new THREE.Mesh(G.tet, glow(hex)); }
+export function makeChunk(hex) { return new THREE.Mesh(G.tet, gmat(hex, 'chunk', { glow: true })); }
 
 // Bake many motionless props into a few meshes (one per material per map chunk) so the whole
 // world can be on screen at once when the camera pulls back.
@@ -332,7 +345,7 @@ export function mergeStatic(groups) {
   const by = new Map(), v = new THREE.Vector3(), nm = new THREE.Matrix3();
   for (const g of groups) {
     g.updateMatrixWorld(true);
-    const key = Math.floor(g.position.x / 32) + '|' + Math.floor(g.position.z / 40);
+    const key = Math.floor(g.position.x / 32) + '|' + Math.floor(g.position.z / 32);
     g.traverse(m => { if (!m.isMesh) return; const k = m.material.uuid + '|' + key; if (!by.has(k)) by.set(k, { mat: m.material, list: [] }); by.get(k).list.push(m); });
   }
   const out = [];

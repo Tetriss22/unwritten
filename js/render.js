@@ -4,6 +4,7 @@
 // terrain texture through the same camera, so the glyph grid stays glued to the world while it scrolls.
 import * as THREE from '../lib/three.module.min.js';
 import { CPU, YAW, PITCH } from './terrain.js';
+import { shared, makeMeshAtlas, gmat } from './glyph.js';
 export { CPU, YAW, PITCH };
 
 export const SINP = Math.sin(PITCH), COSP = Math.cos(PITCH), SY = Math.sin(YAW), CY = Math.cos(YAW);
@@ -42,10 +43,10 @@ const f = (n) => n.toFixed(6);
 
 const FRAG = `
 precision highp float;
-uniform sampler2D tObj, tRefl, tShadow, tTerrain, tText, tAtlasF, tAtlasC;
+uniform sampler2D tRefl, tShadow, tTerrain, tText, tAtlasF, tAtlasC;
 uniform vec2 uRes, uOrigin, uFine, uObj0, uObjSize, uTerSize, uPlayer;
-uniform float uU, uG, uTime, uReveal, uFlash, uWeatherAmt, uDark, uBloom, uSeed, uMap;
-uniform int uWeather;
+uniform float uU, uG, uTime, uSeed, uMap;
+uniform vec4 uScar[4];
 uniform vec3 uPal[80];
 uniform float uTextLen[8];
 uniform vec4 uLights[${MAX_LIGHTS}];
@@ -54,7 +55,7 @@ uniform vec3 uErase[${MAX_ERASE}];
 uniform vec4 uPulse[${MAX_PULSE}];
 uniform vec3 uPulseCol[${MAX_PULSE}];
 uniform vec4 uLine[4];
-uniform vec3 uAmbient, uBg, uWeatherCol;
+uniform vec3 uAmbient, uBg;
 const int RN = ${RAMP.length};
 const int RAMP[${RAMP.length}] = int[](${[...RAMP].map(c => c.charCodeAt(0) - 32).join(',')});
 const vec2 INVX = vec2(${f(CY)}, ${f(SY / SINP)});
@@ -92,7 +93,6 @@ void main(){
   vec2 fcell = floor(wp / uFine), fuv = fract(wp / uFine);
   ivec2 oi = ivec2(fcell - uObj0);
   int rows = int(uObjSize.y);
-  vec4 obj = texelFetch(tObj, ivec2(oi.x, rows - 1 - oi.y), 0);
 
   // ---- ground glyph cell and the spot of world under it
   vec2 gc = floor(wp / uG), cuv = fract(wp / uG);
@@ -163,6 +163,13 @@ void main(){
     float dl = l.y < 0.5 ? abs(w.y - l.x) : abs(w.x - l.x);
     if (dl < l.z) { pulse += mix(vec3(1.0, 0.12, 0.22), vec3(1.0), clamp(l.w - 1.0, 0.0, 1.0)) * min(l.w, 1.6) * (0.45 + 0.55 * hc); code = l.y < 0.5 ? ch(61) : ch(35); }
   }
+  for (int i = 0; i < 4; i++) {   // the quill leaves a mark where it cut
+    vec4 sc = uScar[i];
+    if (sc.w <= 0.0) continue;
+    vec2 dv = w - sc.xy; float dr = length(dv);
+    float da = abs(mod(atan(dv.y, dv.x) - sc.z + 3.14159, 6.28318) - 3.14159);
+    if (dr > 0.7 && dr < 2.1 && (da < 1.15 || sc.z > 50.0) && hc > 0.25) { pulse += vec3(1.0, 0.45, 0.72) * sc.w * (0.5 + 0.5 * hc2); code = hc2 > 0.6 ? ch(120) : (hc2 > 0.3 ? ch(61) : ch(126)); }
+  }
   float erased = 0.0;
   for (int i = 0; i < ${MAX_ERASE}; i++) {
     vec3 e = uErase[i];
@@ -194,62 +201,49 @@ void main(){
     }
   }
 
-  // ---- 3D objects as fine glyphs
-  if (obj.a > 0.5) {
-    vec3 oc = pow(obj.rgb, vec3(0.4545));
-    if (obj.a > 0.9) {
-      vec3 Lo = lightAt(ground((fcell + 0.5) * uFine) + vec2(0.3, 0.45));
-      float lo = max(Lo.r, max(Lo.g, Lo.b));
-      oc *= clamp(0.2 + lo * 0.8, 0.0, 1.25) * mix(vec3(1.0), Lo / max(lo, 0.001), 0.3);
-    }
-    float ol = max(oc.r, max(oc.g, oc.b));
-    int idx = int(clamp(pow(ol, 0.8) * float(RN) + 1.0, 2.0, float(RN - 1)));
-    float m = glyph(tAtlasF, float(RAMP[idx]), fuv);
-    vec3 hue = oc / max(ol, 0.001);
-    outc = uBg * 0.5 + hue * (0.32 + 0.72 * ol) * m + oc * 0.08;
-  }
-  vec2 buv = (wp / uFine - uObj0) / uObjSize;
-  vec4 bl = texture(tObj, vec2(buv.x, 1.0 - buv.y));
-  outc += pow(bl.rgb, vec3(0.4545)) * bl.a * uBloom * (1.0 - obj.a * 0.6);
-
-  // ---- weather in screen space
-  if (uWeather > 0) {
-    vec2 sc = floor(sp / uFine);
-    if (uWeather == 1) {
-      float colId = sc.x + floor(sc.y * 0.34);
-      float h = hash(vec2(colId, 7.0));
-      if (h < uWeatherAmt) {
-        float seg = mod(sc.y - uTime * (34.0 + h * 30.0) + h * 400.0, 46.0 + h * 50.0);
-        if (seg < 4.0) outc += uWeatherCol * (0.25 + seg * 0.14) * glyph(tAtlasF, ch(47), fuv);
-      }
-    } else if (uWeather == 2) {
-      float drift = floor(sin(sc.y * 0.07 + uTime * 0.6 + hash(vec2(sc.x, 1.0)) * 6.0) * 2.0);
-      float h = hash(vec2(sc.x + drift, 3.0));
-      if (h < uWeatherAmt) {
-        float seg = mod(sc.y - uTime * (7.0 + h * 9.0) + h * 300.0, 30.0 + h * 40.0);
-        if (seg < 1.0) outc += uWeatherCol * (0.5 + 0.5 * h) * glyph(tAtlasF, h > uWeatherAmt * 0.5 ? ch(42) : ch(46), fuv);
-      }
-    } else if (uWeather == 3) {
-      float drift = floor(sin(sc.y * 0.09 + uTime * 0.8 + hash(vec2(sc.x, 2.0)) * 6.0) * 2.0);
-      float h = hash(vec2(sc.x + drift, 5.0));
-      if (h < uWeatherAmt) {
-        float seg = mod(sc.y + uTime * (5.0 + h * 8.0) + h * 300.0, 34.0 + h * 40.0);
-        if (seg < 1.0) outc += uWeatherCol * (0.4 + 0.6 * h) * glyph(tAtlasF, h > uWeatherAmt * 0.5 ? ch(39) : ch(46), fuv);
-      }
-    }
-  }
-
-  vec2 q = sp / uRes - 0.5;
-  outc *= 1.0 - dot(q, q) * (0.8 + uDark);
-  outc += vec3(0.6, 0.04, 0.1) * uFlash * (0.04 + dot(q, q) * 1.5);
-  if (hash(gc * 1.37 + 3.1) > uReveal) outc = uBg * 0.5;
   gl_FragColor = vec4(outc, 1.0);
+}`;
+
+const OVER = `
+precision highp float;
+uniform sampler2D tAtlasF;
+uniform vec2 uRes, uOrigin, uFine;
+uniform float uG, uTime, uReveal, uFlash, uWeatherAmt, uDark;
+uniform int uWeather;
+uniform vec3 uWeatherCol, uBg;
+float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float glyph(float code, vec2 g){
+  float c = mod(code, 16.0), r = floor(code / 16.0);
+  return texture(tAtlasF, vec2((c + clamp(g.x, 0.04, 0.96)) / 16.0, 1.0 - (r + clamp(g.y, 0.03, 0.97)) / 6.0)).r;
+}
+void main(){
+  vec2 sp = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
+  vec2 sc = floor(sp / uFine), fuv = fract(sp / uFine);
+  vec3 add = vec3(0.0);
+  if (uWeather == 1) {
+    float h = hash(vec2(sc.x + floor(sc.y * 0.34), 7.0));
+    if (h < uWeatherAmt) { float seg = mod(sc.y - uTime * (34.0 + h * 30.0) + h * 400.0, 46.0 + h * 50.0); if (seg < 4.0) add = uWeatherCol * (0.25 + seg * 0.14) * glyph(15.0, fuv); }
+  } else if (uWeather == 2) {
+    float drift = floor(sin(sc.y * 0.07 + uTime * 0.6 + hash(vec2(sc.x, 1.0)) * 6.0) * 2.0);
+    float h = hash(vec2(sc.x + drift, 3.0));
+    if (h < uWeatherAmt) { float seg = mod(sc.y - uTime * (7.0 + h * 9.0) + h * 300.0, 30.0 + h * 40.0); if (seg < 1.0) add = uWeatherCol * (0.5 + 0.5 * h) * glyph(h > uWeatherAmt * 0.5 ? 10.0 : 14.0, fuv); }
+  } else if (uWeather == 3) {
+    float drift = floor(sin(sc.y * 0.09 + uTime * 0.8 + hash(vec2(sc.x, 2.0)) * 6.0) * 2.0);
+    float h = hash(vec2(sc.x + drift, 5.0));
+    if (h < uWeatherAmt) { float seg = mod(sc.y + uTime * (5.0 + h * 8.0) + h * 300.0, 34.0 + h * 40.0); if (seg < 1.0) add = uWeatherCol * (0.4 + 0.6 * h) * glyph(h > uWeatherAmt * 0.5 ? 7.0 : 14.0, fuv); }
+  }
+  vec2 q = sp / uRes - 0.5;
+  float dark = clamp(dot(q, q) * (0.8 + uDark), 0.0, 1.0);
+  add += vec3(0.6, 0.04, 0.1) * uFlash * (0.04 + dot(q, q) * 1.5);
+  vec2 gc = floor((uOrigin + sp) / uG);
+  if (hash(gc * 1.37 + 3.1) > uReveal) { add = uBg * 0.5; dark = 1.0; }
+  gl_FragColor = vec4(add, dark);
 }`;
 
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
-    this.r = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' });
+    this.r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
     this.r.setPixelRatio(1);
     this.scene = new THREE.Scene();
     this.root = new THREE.Group();          // everything standing on the page; re-posed for shadows and reflections
@@ -267,11 +261,12 @@ export class Renderer {
     this.fsCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const U = (v) => ({ value: v });
     this.u = {
-      tObj: U(null), tRefl: U(null), tShadow: U(null), tTerrain: U(null), tText: U(null), tAtlasF: U(null), tAtlasC: U(null),
+      tRefl: U(null), tShadow: U(null), tTerrain: U(null), tText: U(null), tAtlasF: U(null), tAtlasC: U(null),
       uRes: U(new THREE.Vector2()), uOrigin: U(new THREE.Vector2()), uFine: U(new THREE.Vector2()),
       uObj0: U(new THREE.Vector2()), uObjSize: U(new THREE.Vector2()), uTerSize: U(new THREE.Vector2()), uPlayer: U(new THREE.Vector2()),
-      uU: U(1), uG: U(1), uTime: U(0), uReveal: U(1), uFlash: U(0), uWeatherAmt: U(0), uDark: U(0), uBloom: U(0.14), uSeed: U(0), uMap: U(0),
+      uU: U(1), uG: U(1), uTime: U(0), uReveal: U(1), uFlash: U(0), uWeatherAmt: U(0), uDark: U(0), uSeed: U(0), uMap: U(0),
       uWeather: U(0),
+      uScar: U(Array.from({ length: 4 }, () => new THREE.Vector4())),
       uPal: U(Array.from({ length: 80 }, () => new THREE.Vector3(1, 1, 1))),
       uTextLen: U(new Array(8).fill(1)),
       uLights: U(Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4())),
@@ -284,8 +279,14 @@ export class Renderer {
     };
     this.mat = new THREE.ShaderMaterial({ uniforms: this.u, vertexShader: VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false });
     this.fsScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.mat));
+    const ou = this.u;
+    this.over = new THREE.ShaderMaterial({ uniforms: { tAtlasF: ou.tAtlasF, uRes: ou.uRes, uOrigin: ou.uOrigin, uFine: ou.uFine, uG: ou.uG, uTime: ou.uTime, uReveal: ou.uReveal, uFlash: ou.uFlash, uWeatherAmt: ou.uWeatherAmt, uDark: ou.uDark, uWeather: ou.uWeather, uWeatherCol: ou.uWeatherCol, uBg: ou.uBg },
+      vertexShader: VERT, fragmentShader: OVER, depthTest: false, depthWrite: false, transparent: true, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor });
+    this.overScene = new THREE.Scene(); this.overScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.over));
+    makeMeshAtlas(FONT);
+    this.flat = new THREE.MeshBasicMaterial({ color: 0xd8d0ff });
     this.terrainTex = null; this.ox = 0; this.oy = 0;
-    this.xray = new THREE.MeshBasicMaterial({ color: 0x8f7fe0, depthFunc: THREE.GreaterDepth, depthWrite: false, transparent: true, opacity: 0.75, blending: THREE.NoBlending });
+    this.xray = gmat(0xb8a8ff, 'xray', { glow: true, depthFunc: THREE.GreaterDepth });
     this.resize();
   }
 
@@ -296,16 +297,16 @@ export class Renderer {
     this.r.setSize(W, H, false);
     this.canvas.style.width = innerWidth + 'px'; this.canvas.style.height = innerHeight + 'px';
     this.U0 = Math.max(40, Math.min(W / 7.4, H / 6.6));
-    this.fw = Math.max(5.2, this.U0 / 23); this.fh = this.fw * 1.5;       // object glyphs: constant size on screen
+    this.fw = Math.max(5.2, this.U0 / 23); this.fh = this.fw * 1.5;       // weather glyphs, and the grain of the shadow and reflection buffers
     this.G0 = this.fw * 2.1;                               // ground glyphs at zoom 1
     this.cols = Math.ceil(W / this.fw) + 2; this.rows = Math.ceil(H / this.fh) + 2;
     const opts = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true, type: THREE.UnsignedByteType };
-    for (const k of ['rtObj', 'rtRefl', 'rtShadow']) { if (this[k]) this[k].dispose(); this[k] = new THREE.WebGLRenderTarget(this.cols, this.rows, opts); }
+    for (const k of ['rtRefl', 'rtShadow']) { if (this[k]) this[k].dispose(); this[k] = new THREE.WebGLRenderTarget(this.cols, this.rows, opts); }
     if (this.atlasF) { this.atlasF.dispose(); this.atlasC.dispose(); }
     this.atlasF = makeAtlas(Math.max(6, Math.round(this.fw * 2)), Math.max(9, Math.round(this.fh * 2)), 800);
     this.atlasC = makeAtlas(Math.max(8, Math.round(this.G0 * 0.76 * 2.4)), Math.max(12, Math.round(this.G0 * 0.94 * 2.4)), 800);
     const u = this.u;
-    u.tObj.value = this.rtObj.texture; u.tRefl.value = this.rtRefl.texture; u.tShadow.value = this.rtShadow.texture;
+    u.tRefl.value = this.rtRefl.texture; u.tShadow.value = this.rtShadow.texture;
     u.tAtlasF.value = this.atlasF; u.tAtlasC.value = this.atlasC;
     u.uRes.value.set(W, H); u.uFine.value.set(this.fw, this.fh); u.uObjSize.value.set(this.cols, this.rows);
     this.setZoom(this.zoom || 1);
@@ -315,7 +316,7 @@ export class Renderer {
   // then each glyph starts to stand for a larger patch of ground.
   setZoom(z) {
     this.zoom = z; this.U = this.U0 * z;
-    this.step = Math.max(1, Math.ceil(0.92 / z));     // ground letters never get too small to read
+    this.step = Math.max(1, Math.ceil(0.5 / z));      // far away the ground letters get small, then merge
     this.G = this.G0 * z * this.step;
   }
 
@@ -356,27 +357,30 @@ export class Renderer {
     cam.updateProjectionMatrix();
     cam.position.set(cx + SY * COSP * 200, SINP * 200, cy + CY * COSP * 200);
     cam.lookAt(cx, 0, cy);
-    const r = this.r, root = this.root;
+    shared.uTime.value = time;
+    const r = this.r, root = this.root, scene = this.scene;
     r.setClearColor(0x000000, 0);
-    // 1. shadows: the scene flattened onto the ground along the light
+    // 1. shadows: the scene flattened onto the ground along the light, low resolution
+    scene.overrideMaterial = this.flat;
     root.matrix.set(1, SHADOW[0], 0, 0, 0, 0.002, 0, 0.01, 0, SHADOW[1], 1, 0, 0, 0, 0, 1); root.updateMatrixWorld(true);
     cam.layers.set(0); cam.layers.enable(3);
-    r.setRenderTarget(this.rtShadow); r.clear(); r.render(this.scene, cam);
-    // 2. reflections: the scene upside down
+    r.setRenderTarget(this.rtShadow); r.clear(); r.render(scene, cam);
+    // 2. reflections: the scene upside down, low resolution
     root.matrix.set(1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1); root.updateMatrixWorld(true);
-    cam.layers.enable(2);
-    r.setRenderTarget(this.rtRefl); r.clear(); r.render(this.scene, cam);
-    // 3. the scene. Layer 1 (the Editor) goes first and its depth is thrown away, so it never hides anything.
+    r.setRenderTarget(this.rtRefl); r.clear(); r.render(scene, cam);
+    scene.overrideMaterial = null;
     root.matrix.identity(); root.updateMatrixWorld(true);
-    r.setRenderTarget(this.rtObj); r.clear();
+    // 3. to the screen: the ground, then everything standing on it at full resolution, each surface in its own letters
+    const l = (ox - scx * U) / U, t = -(oy - scy * U) / U;
+    cam.left = l; cam.right = l + this.W / U; cam.top = t; cam.bottom = t - this.H / U; cam.updateProjectionMatrix();
+    r.setRenderTarget(null); r.setClearColor(0x000000, 1); r.clear();
     r.autoClear = false;
-    cam.layers.set(1); r.render(this.scene, cam); r.clearDepth();
-    cam.layers.set(0); cam.layers.enable(2); r.render(this.scene, cam);
-    // the hero (layer 3): first a flat silhouette wherever something stands in front, then the hero itself
-    cam.layers.set(3); this.scene.overrideMaterial = this.xray; r.render(this.scene, cam); this.scene.overrideMaterial = null;
-    r.render(this.scene, cam);
-    r.autoClear = true;
-    r.setRenderTarget(null);
     r.render(this.fsScene, this.fsCam);
+    cam.layers.set(1); r.render(scene, cam); r.clearDepth();           // the Editor first, depth thrown away: it never hides anything
+    cam.layers.set(0); cam.layers.enable(2); r.render(scene, cam);
+    cam.layers.set(3); scene.overrideMaterial = this.xray; r.render(scene, cam); scene.overrideMaterial = null;   // the hero's outline through walls
+    r.render(scene, cam);                                               // then the hero
+    r.render(this.overScene, this.fsCam);
+    r.autoClear = true;
   }
 }

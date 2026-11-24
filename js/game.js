@@ -3,6 +3,7 @@ import * as THREE from '../lib/three.module.min.js';
 import { Renderer, SY, CY, SINP, MAX_LIGHTS, MAX_ERASE, MAX_PULSE } from './render.js';
 import { LANDS, SIZE, TEXTS, buildWorld } from './terrain.js';
 import * as M from './models.js';
+import { gmat } from './glyph.js';
 import { Audio } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
@@ -16,11 +17,13 @@ const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random(
 
 const audio = new Audio();
 let R = null, W = null;
-const S = { mode: 'boot', land: 0, landT: 0, t: 0, camX: 0, camY: 0, shake: 0, hitstop: 0, flash: 0, reveal: 0, revealTo: 0, amb: 0, deaths: 0, runT: 0, paused: false, timers: [], zoom: 1.05, zoomTo: 1.05, zMin: 0.1, env: null };
+const S = { mode: 'boot', land: 0, landT: 0, t: 0, camX: 0, camY: 0, shake: 0, hitstop: 0, flash: 0, reveal: 0, revealTo: 0, amb: 0, deaths: 0, runT: 0, paused: false, timers: [], zoom: 1.3, zoomTo: 1.3, zMin: 0.1, env: null };
 const P = { x: 0, y: 0, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: 5, maxHp: 5, inv: 0, dashT: 0, dashCd: 0, dx: 0, dy: 0, atkT: 0, atkDur: 0.24, atkCd: 0, combo: 0, comboT: 0, hitDone: true, walk: 0, stepT: 0, burnT: 0, cx: 0, cy: 0, m: null };
 const keys = new Set();
 const input = { mx: 0, my: 0, mouseT: -99, attack: false, held: false, dash: false, sx: 0, sy: 0, stickId: null, ox: 0, oy: 0, pinch: 0 };
 const after = (sec, fn) => S.timers.push({ t: sec, fn });
+const TRAIL = 12, WHITE3 = new THREE.Color(0xffffff);
+const RB = Array.from({ length: 6 }, () => ({ x: 0, z: 0, vx: 0, vz: 0 }));   // the coat's rings, each on a spring
 
 // ---------------------------------------------------------------- save
 const SAVE = 'unwritten.world.v1';
@@ -80,7 +83,10 @@ function loadWorld() {
   W = { B, T: B.T, lamps: B.lamps.slice(), letters: [], gates: B.gates, enemies: [], shots: [], hearts: [], parts: [], pulses: [], flames: [], floats: [], barrierProps: [], lines: [], slams: [], rewrites: [], bossState: 'wait', boss: null, hinted: false, bossTries: 0, wx: { type: 0, amt: 0, col: [1, 1, 1] } };
   W.lands = LANDS.map((def, i) => ({ def, i, letters: [], wordDone: false, lit: false, entered: false, weather: def.weather.slice(), goal: B.goals[i], beacon: null }));
   R.setTerrain(B.T); R.setPalette(LANDS.flatMap(l => l.palette)); R.setTexts(TEXTS);
-  W.spins = [];
+  W.spins = []; W.scars = [];
+  // the ribbon the quill leaves in the air
+  const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL * 18), 3)); tg.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(TRAIL * 18).map((_, i) => i % 3 === 1 ? 1 : 0), 3));
+  W.trail = new THREE.Mesh(tg, gmat(0xff9ad5, 'slash', { glow: true, side: THREE.DoubleSide })); W.trail.frustumCulled = false; W.trail.layers.set(2); W.trailPts = []; R.root.add(W.trail);
   const statics = [];
   for (const p of B.props) {
     const g = M.makeProp(p); place(g, p.x, p.y);
@@ -189,6 +195,7 @@ function startAttack(mx, my, moving) {
 function doHit() {
   const spin = P.combo === 3, range = spin ? 2.15 : 1.8, half = spin ? 4 : 1.25, dmg = spin ? 2 : 1;
   if (spin) pulse(P.x, P.y, [1, 0.95, 0.8], 0.9, 9, 0.28, 0.4);
+  W.scars.push({ x: P.x, y: P.y, a: P.face, t: 0, spin }); if (W.scars.length > 4) W.scars.shift();
   for (const e of W.enemies) {
     if (e.dead) continue;
     const d = dist(P.x, P.y, e.x, e.y), a = Math.atan2(e.y - P.y, e.x - P.x);
@@ -228,7 +235,7 @@ function updatePlayer(dt) {
   const tag = W.T.tagAt(p.x, p.y);
   if (p.dashT > 0) { p.dashT -= dt; p.vx = p.dx * 14.5; p.vy = p.dy * 14.5; }
   else {
-    const sp = (p.atkT > 0 ? 1.5 : 4.7) * (tag === 3 ? 0.85 : 1), k = tag === 2 ? 2.2 : 16;
+    const sp = (p.atkT > 0 ? 1.5 : 4.7) * (tag === 3 ? 0.85 : 1), k = tag === 2 ? 2.2 : (moving ? 10 : 13);
     p.vx += (mx * sp - p.vx) * Math.min(1, k * dt); p.vy += (my * sp - p.vy) * Math.min(1, k * dt);
   }
   p.kx *= Math.pow(0.0008, dt); p.ky *= Math.pow(0.0008, dt);
@@ -236,7 +243,7 @@ function updatePlayer(dt) {
   if (moving && p.atkT <= 0 && p.dashT <= 0) p.face += angDiff(Math.atan2(my, mx), p.face) * Math.min(1, 14 * dt);
   const speed = Math.hypot(p.vx, p.vy);
   p.walk += speed * dt * 2.8;
-  if (speed > 1.5 && p.dashT <= 0) { p.stepT -= dt * speed; if (p.stepT <= 0) { p.stepT = 1.5; audio.play('step'); } }
+  if (speed > 1.5 && p.dashT <= 0) { p.stepT -= dt * speed; if (p.stepT <= 0) { p.stepT = 1.5; audio.play('step'); pulse(p.x, p.y, [0.8, 0.8, 1], 0.22, 2.6, 0.22, 0.15); } }
   if (tag === 1 && p.dashT <= 0) { p.burnT += dt; if (p.burnT > 0.12) hurtPlayer(1, p.x - p.vx, p.y - p.vy + 0.01, 6); } else p.burnT = 0;
   if (p.atkT > 0) {
     const el = p.atkDur - p.atkT;
@@ -248,21 +255,48 @@ function updatePlayer(dt) {
   if (here !== S.land) { S.landT += dt; if (S.landT > 0.5) enterLand(here); } else S.landT = 0;
 }
 function poseHero(dt) {
-  const p = P, m = p.m, speed = S.mode === 'play' ? Math.hypot(p.vx, p.vy) : 0;
+  const p = P, m = p.m, play = S.mode === 'play', speed = play ? Math.hypot(p.vx, p.vy) : 0;
   place(m.g, p.x, p.y); m.g.rotation.y = rotY(p.face);
-  m.body.position.y = speed > 0.5 ? Math.abs(Math.sin(p.walk)) * 0.07 : Math.sin(S.t * 2) * 0.015;
-  const sw = speed > 0.5 ? Math.sin(p.walk) * 0.75 : 0; m.legs[0].rotation.x = sw; m.legs[1].rotation.x = -sw;
-  m.body.rotation.x = p.dashT > 0 ? 0.55 : Math.min(0.2, speed * 0.04);
-  m.scarf.forEach((s, i) => { s.position.x = -0.12 + Math.sin(S.t * 7 - i * 0.9) * (0.04 + i * 0.03); s.position.y = 1.84 + Math.sin(S.t * 5 - i) * 0.03 + Math.min(0.3, speed * 0.03) * i * 0.4; });
-  const el = p.atkDur - p.atkT, spin = p.combo === 3;
-  if (p.atkT > 0 && S.mode === 'play') {
+  const cf = Math.cos(p.face), sf = Math.sin(p.face);
+  const wvx = play ? p.vx + p.kx : 0, wvy = play ? p.vy + p.ky : 0;
+  const lvx = wvx * sf - wvy * cf, lvz = wvx * cf + wvy * sf;          // velocity in the hero's own frame
+  const turn = angDiff(p.face, p.lastFace ?? p.face) / Math.max(dt, 0.001); p.lastFace = p.face;
+  const el = p.atkDur - p.atkT, spin = p.combo === 3, atk = p.atkT > 0 && play;
+  m.body.position.y = speed > 0.5 ? Math.abs(Math.sin(p.walk)) * 0.08 : Math.sin(S.t * 2) * 0.015;
+  m.body.rotation.x = lerp(m.body.rotation.x, p.dashT > 0 ? 0.6 : clamp(lvz * 0.045, -0.15, 0.3) + (atk ? 0.22 : 0), Math.min(1, dt * 12));
+  m.body.rotation.z = lerp(m.body.rotation.z, clamp(-lvx * 0.05 - turn * 0.012, -0.3, 0.3), Math.min(1, dt * 10));
+  const sw = speed > 0.5 ? Math.sin(p.walk) * 0.8 : 0; m.legs[0].rotation.x = sw; m.legs[1].rotation.x = -sw;
+  // coat: each ring is pulled toward where the one above was, so the hem lags, swings and flares
+  const sub = Math.min(dt, 0.033), flare = Math.min(0.3, speed * 0.018) + (atk && spin ? 0.45 : atk ? 0.15 : 0) + (p.dashT > 0 ? 0.2 : 0);
+  RB.forEach((r, i) => {
+    const k = (i + 1) / 6, lim = 0.07 + 0.16 * k;
+    const tx = clamp(-lvx * 0.045 * k - turn * 0.02 * k, -lim, lim), tz = clamp(-lvz * 0.05 * k, -lim, lim) + Math.sin(S.t * 2.2 + i * 0.5) * 0.012 * k;
+    r.vx += ((tx - r.x) * 70 - r.vx * 8) * sub; r.vz += ((tz - r.z) * 70 - r.vz * 8) * sub; r.x += r.vx * sub; r.z += r.vz * sub;
+    const mesh = m.robe[i], w = (0.6 + i * 0.085) * (1 + flare * k);
+    mesh.position.x = r.x; mesh.position.z = r.z; mesh.scale.x = w; mesh.scale.z = w * 0.88;
+  });
+  m.scarf.forEach((sc, i) => { const r = RB[Math.min(5, i + 1)]; sc.position.x = -0.14 + r.x * 2.2 + Math.sin(S.t * 7 - i * 0.9) * (0.03 + i * 0.03); sc.position.z = -0.34 - i * 0.26 + r.z * 1.6; sc.position.y = 2.02 + Math.sin(S.t * 5 - i) * 0.03 + Math.min(0.3, speed * 0.03) * i * 0.4; });
+  m.tip.rotation.x = -0.8 - clamp(lvz * 0.07, -0.2, 0.6); m.head.rotation.y = clamp(turn * 0.02, -0.4, 0.4);
+  if (atk) {
     const k = clamp(el / p.atkDur, 0, 1), dir = p.combo === 2 ? -1 : 1;
     m.armR.rotation.set(-0.1, spin ? k * Math.PI * 2 : dir * lerp(1.7, -1.7, k), 0);
     m.arc.visible = !spin && el > 0.03 && el < 0.17; m.arc.scale.setScalar(1.5 + k * 0.5); m.arc.scale.y *= dir;
     m.spin.visible = spin && el > 0.04 && el < 0.26; m.spin.scale.setScalar(0.9 + k * 1.3);
   } else { m.armR.rotation.set(-1.2 - sw * 0.1, 0.12, 0); m.arc.visible = m.spin.visible = false; }
-  m.armL.rotation.x = -0.2 + sw * 0.2;
+  m.armL.rotation.x = -0.2 + sw * 0.2; m.lantern.rotation.x = clamp(-lvz * 0.06, -0.5, 0.5) - sw * 0.1;
   if (S.mode !== 'dead') m.g.visible = !(p.inv > 0 && p.dashT <= 0 && Math.floor(S.t * 22) % 2 === 0);
+  // the quill's ribbon: remember where the blade was for the last moments of a swing or a dash
+  m.g.updateMatrixWorld(true);
+  const pts = W.trailPts;
+  for (const q of pts) q.t += dt;
+  while (pts.length && pts[0].t > 0.16) pts.shift();
+  if ((atk || p.dashT > 0) && m.g.visible) { pts.push({ a: m.tipMark.getWorldPosition(new THREE.Vector3()), b: m.baseMark.getWorldPosition(new THREE.Vector3()), t: 0 }); if (pts.length > TRAIL + 1) pts.shift(); }
+  const arr = W.trail.geometry.attributes.position.array; arr.fill(0);
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1], o = i * 18;
+    for (const [k, v] of [[0, a.a], [1, a.b], [2, b.a], [3, a.b], [4, b.b], [5, b.a]]) { arr[o + k * 3] = v.x; arr[o + k * 3 + 1] = v.y; arr[o + k * 3 + 2] = v.z; }
+  }
+  W.trail.geometry.attributes.position.needsUpdate = true;
 }
 function enterLand(i) {
   S.land = i; S.landT = 0;
@@ -565,6 +599,7 @@ function updateWorld(dt) {
   W.shots = W.shots.filter(s => s.life > 0);
   for (const p of W.parts) { p.life -= dt; p.vh -= 14 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.h = Math.max(0.05, p.h + p.vh * dt); place(p.m, p.x, p.y, p.h); p.m.rotation.x += dt * 9; p.m.rotation.y += dt * 7; if (p.life <= 0) removeObj(p.m); }
   W.parts = W.parts.filter(p => p.life > 0);
+  for (const sc of W.scars) sc.t += dt; W.scars = W.scars.filter(sc => sc.t < 1.5);
   for (const p of W.pulses) { p.life -= dt; p.r = Math.max(0.05, p.r + p.v * dt); }
   W.pulses = W.pulses.filter(p => p.life > 0);
   // the air of the land we are in
@@ -647,6 +682,7 @@ function fillUniforms() {
   for (const s of W.slams) if (s.set && !s.done && ps.length < MAX_PULSE) ps.push({ x: s.x, y: s.y, r: 1.75, life: 1, max: 1, col: [1, 0.15, 0.25], w: 0.9 + Math.sin(S.t * 30) * 0.3 });
   for (let i = 0; i < MAX_PULSE; i++) { const p = ps[i]; if (p) { u.uPulse.value[i].set(p.x, p.y, p.r, p.w * clamp(p.life / p.max, 0, 1)); u.uPulseCol.value[i].set(...p.col); } else u.uPulse.value[i].set(0, 0, 0, 0); }
   for (let i = 0; i < 4; i++) { const l = W.lines[i]; if (l && l.t >= 0) u.uLine.value[i].set(l.pos, l.dir, l.hw, l.t < l.tele ? 0.3 + 0.3 * (Math.floor(l.t * 12) % 2) + l.t / l.tele * 0.3 : 2.2); else u.uLine.value[i].set(0, 0, 0, 0); }
+  for (let i = 0; i < 4; i++) { const sc = W.scars[i]; if (sc) u.uScar.value[i].set(sc.x, sc.y, sc.spin ? 99 : sc.a, 1 - sc.t / 1.5); else u.uScar.value[i].set(0, 0, 0, 0); }
   // pulling the camera back turns the lights up, so the map can be read
   const k = S.amb + zoomBright() * 0.85, a = env.amb;
   u.uMap.value = clamp((0.5 - S.zoom) / 0.25, 0, 1);
@@ -655,8 +691,8 @@ function fillUniforms() {
   u.uDark.value = env.dark * (1 - zoomBright()) - zoomBright() * 0.55;
   u.uPlayer.value.set(P.x, P.y); u.uReveal.value = S.reveal; u.uFlash.value = S.flash;
   u.uWeather.value = W.wx.type; u.uWeatherAmt.value = W.wx.amt * (1 - zoomBright() * 0.7); u.uWeatherCol.value.set(...W.wx.col);
-  R.ambient.color.copy(env.a3c); R.ambient.intensity = env.a3i + k * 1.1;
-  R.moon.color.copy(env.mc); R.moon.intensity = env.mi;
+  R.ambient.color.copy(env.a3c).lerp(WHITE3, 0.45); R.ambient.intensity = env.a3i * 2.4 + k * 1.2;
+  R.moon.color.copy(env.mc).lerp(WHITE3, 0.3); R.moon.intensity = env.mi * 2.0;
 }
 function objective() {
   if (S.mode !== 'play' || W.bossState === 'fight' || W.bossState === 'dying') return null;
@@ -718,7 +754,7 @@ function camera(dt) {
   if (keys.has('Equal') || keys.has('NumpadAdd')) S.zoomTo *= Math.pow(2.2, dt);
   if (keys.has('Minus') || keys.has('NumpadSubtract')) S.zoomTo *= Math.pow(2.2, -dt);
   S.zMin = Math.min(R.W / ((SIZE[0] * CY + SIZE[1] * SY) * R.U0), R.H / ((SIZE[0] * SY + SIZE[1] * CY) * SINP * R.U0)) * 0.97;
-  S.zoomTo = clamp(S.zoomTo, S.zMin, 1.7);
+  S.zoomTo = clamp(S.zoomTo, S.zMin, 2.2);
   S.zoom = Math.abs(S.zoomTo - S.zoom) < 0.002 ? S.zoomTo : S.zoom * Math.pow(S.zoomTo / S.zoom, Math.min(1, dt * 9));
   R.setZoom(S.zoom);
   let tx = P.x + Math.cos(P.face) * 0.5 - SY * 0.9, ty = P.y + Math.sin(P.face) * 0.5 - CY * 0.9;
@@ -743,7 +779,7 @@ function frame(now) {
 }
 
 // ---------------------------------------------------------------- input
-function zoomBy(f) { S.zoomTo = clamp(S.zoomTo * f, S.zMin, 1.7); }
+function zoomBy(f) { S.zoomTo = clamp(S.zoomTo * f, S.zMin, 2.2); }
 function bind() {
   addEventListener('keydown', (e) => {
     if (e.repeat) return;
@@ -753,7 +789,7 @@ function bind() {
     if (e.code === 'KeyJ' || e.code === 'Space') { input.attack = true; input.held = true; }
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyK') input.dash = true;
     if (e.code === 'KeyM') toggleSound();
-    if (e.code === 'KeyZ') S.zoomTo = S.zoomTo < 0.5 ? 1.05 : S.zMin;
+    if (e.code === 'KeyZ') S.zoomTo = S.zoomTo < 0.5 ? 1.3 : S.zMin;
     if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
   });
   addEventListener('keyup', (e) => { keys.delete(e.code); if (e.code === 'KeyJ' || e.code === 'Space') input.held = false; });
@@ -790,7 +826,7 @@ function bind() {
   $('pz').addEventListener('click', togglePause);
   $('zin').addEventListener('click', () => zoomBy(1.5));
   $('zout').addEventListener('click', () => zoomBy(1 / 1.5));
-  $('zmap').addEventListener('click', () => { S.zoomTo = S.zoomTo < 0.5 ? 1.05 : S.zMin; });
+  $('zmap').addEventListener('click', () => { S.zoomTo = S.zoomTo < 0.5 ? 1.3 : S.zMin; });
   $('resume').addEventListener('click', togglePause);
   $('quit').addEventListener('click', () => location.reload());
   $('again').addEventListener('click', () => { clearSave(); location.reload(); });

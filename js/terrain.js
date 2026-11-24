@@ -334,6 +334,17 @@ export function buildWorld() {
       break;
     }
   }
+  // things people leave around buildings: wells, crates, carts; signposts where roads meet
+  const DETAIL = [['well', 'crates', 'cart', 'crates'], ['crates'], ['crates'], ['crates', 'cart'], []];
+  for (const q of sites.slice()) {
+    const land = T.regAt(q.x, q.y), list = DETAIL[land]; if (!list.length || R() < 0.3) continue;
+    for (let tries = 0; tries < 6; tries++) {
+      const a = R() * 6.283, x = q.x + Math.cos(a) * 2.6, y = q.y + Math.sin(a) * 2.6;
+      if (walk(x, y) < 0.7 || stripAt(x, y, 1) || hides(x, y) || sites.some(o => o !== q && Math.hypot(o.x - x, o.y - y) < 2.4)) continue;
+      sites.push({ x, y }); props.push({ type: pick(list), x, y, s: 0.9 + R() * 0.2, rot: R() * 6.28, v: R() }); break;
+    }
+  }
+  for (const id of ['XS', 'N2', 'W1', 'E1', 'S1', 'S2']) { const n = N[id], a = backA + 0.9, x = n.x + Math.cos(a) * (n.r + 0.5), y = n.y + Math.sin(a) * (n.r + 0.5); if (walk(x, y) > 0.2) { sites.push({ x, y }); props.push({ type: 'sign', x, y, s: 1.1, rot: Math.atan2(n.x - x, n.y - y), v: R() }); } }
   for (let gy = 0.6; gy < hu; gy += 1.25) for (let gx = 0.6; gx < wu; gx += 1.25) {
     const x = gx + (R() - 0.5) * 0.9, y = gy + (R() - 0.5) * 0.9, d = walk(x, y), P = LANDS[T.regAt(x, y)].props;
     if (d < 0.55 || d > 4.6 || stripAt(x, y, 0.7) || R() > P.borderP * (1 - (d - 0.55) / 6)) continue;

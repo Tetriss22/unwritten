@@ -36,11 +36,12 @@ A lit lantern makes its whole land brighter, which you can see from the map view
 Everything on screen is text.
 
 - The camera is isometric: turned 32 degrees and tilted, so buildings show two walls and a roof and roads run diagonally.
-- Everything standing on the page (the Scribe, enemies, houses, windmills, towers, fences, trees) is real low-poly 3D, rendered tiny and redrawn as small glyphs chosen by brightness. Lit windows and lanterns stay bright in the dark.
-- The ground is read from one terrain texture through the same camera, as a grid of bold glyphs glued to the world. Zooming in makes the letters big; zooming out makes each letter stand for a larger patch, so it stays readable.
-- Two more low-resolution passes of the same scene give shadows on the ground and reflections in water.
-- Wind crosses the world in bands: grass and wheat lean with each gust and bend away from your feet.
-- Light, weather, the rings from hits and the holes the enemies leave in the page are all done per glyph in one fragment shader.
+- Everything standing on the page is real low-poly 3D whose surfaces are written in letters. Each kind of surface has its own symbols and letter size: walls in `H#N[]=I`, roofs in `=^/\A`, leaves in `&%@oO8`, the unwriters in heavy purple `@&%8$#`. The letters live in the surface's own space, so they wrap around towers, lie flat on roofs and move with whatever they are painted on.
+- The Scribe is written in the smallest, whitest letters on the page, so nothing else looks like the hero. A dim outline shows through walls and trees.
+- The ground is read from one terrain texture through the same camera, as a grid of bold glyphs glued to the world.
+- Movement has weight: the coat is a stack of rings on springs, so the hem lags, swings and flares; the scarf and hood trail; the quill leaves a ribbon in the air and a scar of `x = ~` on the ground where it cut.
+- Wind crosses the world in bands: grass, wheat, reeds and tree crowns lean with each gust, and grass bends away from your feet.
+- Two low-resolution passes of the same scene give shadows on the ground and reflections in water.
 - Sound and music are synthesised with Web Audio. There are no image or audio files.
 
 Built with Claude Fable 5.2. Rendering uses [three.js](https://threejs.org) (MIT). Font: [JetBrains Mono](https://www.jetbrains.com/lp/mono/) (SIL OFL 1.1).
