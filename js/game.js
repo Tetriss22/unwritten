@@ -22,6 +22,7 @@ const P = { x: 0, y: 0, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: 5, maxHp: 5, in
 const keys = new Set();
 const input = { mx: 0, my: 0, mouseT: -99, attack: false, held: false, dash: false, use: false, ride: false, fire: false, swap: false, s1: false, s2: false, sx: 0, sy: 0, stickId: null, ox: 0, oy: 0, pinch: 0 };
 const after = (sec, fn) => S.timers.push({ t: sec, fn });
+const nowMs = () => S.cap ? S.capT * 1000 : performance.now();     // filming steps the game by hand, so time must not run on its own
 const TRAIL = 12, WHITE3 = new THREE.Color(0xffffff);
 const RB = Array.from({ length: 6 }, () => ({ x: 0, z: 0, vx: 0, vz: 0 }));   // the coat's rings, each on a spring
 
@@ -80,7 +81,7 @@ function glow(x, y, r, int, col, life) { W.glows.push({ x, y, r, int, col, life,
 const floats = [];
 function floatText(x, y, h, text, cls) {
   const el = document.createElement('div'); el.className = 'ft ' + cls; el.textContent = text; $('fx').appendChild(el);
-  floats.push({ el, x: x + rnd(-0.3, 0.3), y, h, t: performance.now() }); if (floats.length > 24) floats.shift().el.remove();
+  floats.push({ el, x: x + rnd(-0.3, 0.3), y, h, t: nowMs() }); if (floats.length > 24) floats.shift().el.remove();
 }
 function removeObj(o) { if (o && o.parent) o.parent.remove(o); }
 
@@ -989,7 +990,7 @@ function updateOverlay() {
   }
   const you = $('you2'), [hx, hy] = R.toScreen(P.x, P.y, 3.1 + P.h + (P.mounted ? 0.8 : 0));
   you.style.display = near && P.m.g.visible ? 'block' : 'none'; you.style.transform = `translate(${hx}px, ${hy}px) translate(-50%, -100%)`;
-  const now = performance.now();
+  const now = nowMs();
   for (const f of floats) {
     const age = (now - f.t) / 1000, [x, y] = R.toScreen(f.x, f.y, f.h + age * 1.8);
     f.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${1 + Math.max(0, 0.12 - age) * 4})`; f.el.style.opacity = clamp(1.6 - age * 2, 0, 1);
@@ -1049,7 +1050,7 @@ let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (!W) return;
+  if (!W || S.cap) return;
   if (!S.paused) for (let i = 0; i < (S.steps || 1); i++) step(dt);
   camera(dt);
   fillUniforms();
@@ -1059,6 +1060,8 @@ function frame(now) {
 }
 
 // ---------------------------------------------------------------- input
+// one hand-cranked frame, for filming the trailer
+function tick(dt) { S.capT = (S.capT || 0) + dt; step(dt); camera(dt); fillUniforms(); const sh = S.shake * S.shake * R.U * 0.5; R.render(S.camX, S.camY, S.t, (Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh); updateOverlay(); }
 function zoomBy(f) { S.zoomTo = clamp(S.zoomTo * f, S.zMin, 2.2); }
 function bind() {
   addEventListener('keydown', (e) => {
@@ -1147,7 +1150,7 @@ async function boot() {
     audio.pending = LANDS[0].music;
     requestAnimationFrame(frame);
     const q = new URLSearchParams(location.search);
-    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire, castFire, castBolt, gainXP, nextWeapon };
+    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire, castFire, castBolt, gainXP, nextWeapon, tick, setWeapon, say };
   } catch (err) {
     console.error(err); $('err').style.display = 'flex'; $('title').classList.remove('on');
   }
