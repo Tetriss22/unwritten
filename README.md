@@ -35,9 +35,12 @@ A lit lantern makes its whole land brighter, which you can see from the map view
 
 Everything on screen is text.
 
-- The ground is a world-anchored grid of large glyphs read from one terrain texture for the whole world, so it scrolls like a tile map. Zooming out makes one glyph stand for a larger block of ground, so it stays text at any distance.
-- Everything standing on it (the Scribe, enemies, trees, lanterns) is real low-poly 3D, rendered tiny and redrawn as small glyphs chosen by brightness.
-- Light, water reflections, weather, the rings from hits and the holes the enemies leave in the page are all done per glyph in one fragment shader.
+- The camera is isometric: turned 32 degrees and tilted, so buildings show two walls and a roof and roads run diagonally.
+- Everything standing on the page (the Scribe, enemies, houses, windmills, towers, fences, trees) is real low-poly 3D, rendered tiny and redrawn as small glyphs chosen by brightness. Lit windows and lanterns stay bright in the dark.
+- The ground is read from one terrain texture through the same camera, as a grid of bold glyphs glued to the world. Zooming in makes the letters big; zooming out makes each letter stand for a larger patch, so it stays readable.
+- Two more low-resolution passes of the same scene give shadows on the ground and reflections in water.
+- Wind crosses the world in bands: grass and wheat lean with each gust and bend away from your feet.
+- Light, weather, the rings from hits and the holes the enemies leave in the page are all done per glyph in one fragment shader.
 - Sound and music are synthesised with Web Audio. There are no image or audio files.
 
 Built with Claude Fable 5.2. Rendering uses [three.js](https://threejs.org) (MIT). Font: [JetBrains Mono](https://www.jetbrains.com/lp/mono/) (SIL OFL 1.1).

@@ -1,7 +1,7 @@
 // UNWRITTEN — game loop, the Scribe, the unwriters, one small world of five lands and the Editor.
 import * as THREE from '../lib/three.module.min.js';
-import { Renderer, SIN, MAX_LIGHTS, MAX_ERASE, MAX_PULSE } from './render.js';
-import { LANDS, SIZE, buildWorld } from './terrain.js';
+import { Renderer, SY, CY, SINP, MAX_LIGHTS, MAX_ERASE, MAX_PULSE } from './render.js';
+import { LANDS, SIZE, TEXTS, buildWorld } from './terrain.js';
 import * as M from './models.js';
 import { Audio } from './audio.js';
 
@@ -10,13 +10,13 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 const angDiff = (a, b) => { let d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
-const rotY = (a) => Math.atan2(Math.cos(a), Math.sin(a) / SIN);
-const place = (o, x, y, h = 0) => o.position.set(x, h, y / SIN);
+const rotY = (a) => Math.atan2(Math.cos(a), Math.sin(a));
+const place = (o, x, y, h = 0) => o.position.set(x, h, y);
 const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
 
 const audio = new Audio();
 let R = null, W = null;
-const S = { mode: 'boot', land: 0, landT: 0, t: 0, camX: 0, camY: 0, shake: 0, hitstop: 0, flash: 0, reveal: 0, revealTo: 0, amb: 0, deaths: 0, runT: 0, paused: false, timers: [], zoom: 0.85, zoomTo: 0.85, zMin: 0.1, env: null };
+const S = { mode: 'boot', land: 0, landT: 0, t: 0, camX: 0, camY: 0, shake: 0, hitstop: 0, flash: 0, reveal: 0, revealTo: 0, amb: 0, deaths: 0, runT: 0, paused: false, timers: [], zoom: 1.05, zoomTo: 1.05, zMin: 0.1, env: null };
 const P = { x: 0, y: 0, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: 5, maxHp: 5, inv: 0, dashT: 0, dashCd: 0, dx: 0, dy: 0, atkT: 0, atkDur: 0.24, atkCd: 0, combo: 0, comboT: 0, hitDone: true, walk: 0, stepT: 0, burnT: 0, cx: 0, cy: 0, m: null };
 const keys = new Set();
 const input = { mx: 0, my: 0, mouseT: -99, attack: false, held: false, dash: false, sx: 0, sy: 0, stickId: null, ox: 0, oy: 0, pinch: 0 };
@@ -79,15 +79,16 @@ function loadWorld() {
   const B = buildWorld();
   W = { B, T: B.T, lamps: B.lamps.slice(), letters: [], gates: B.gates, enemies: [], shots: [], hearts: [], parts: [], pulses: [], flames: [], floats: [], barrierProps: [], lines: [], slams: [], rewrites: [], bossState: 'wait', boss: null, hinted: false, bossTries: 0, wx: { type: 0, amt: 0, col: [1, 1, 1] } };
   W.lands = LANDS.map((def, i) => ({ def, i, letters: [], wordDone: false, lit: false, entered: false, weather: def.weather.slice(), goal: B.goals[i], beacon: null }));
-  R.setTerrain(B.T); R.setPalette(LANDS.flatMap(l => l.palette));
+  R.setTerrain(B.T); R.setPalette(LANDS.flatMap(l => l.palette)); R.setTexts(TEXTS);
+  W.spins = [];
   const statics = [];
   for (const p of B.props) {
     const g = M.makeProp(p); place(g, p.x, p.y);
     let dyn = p.barrier !== undefined;
-    g.traverse(m => { if (m.userData.flame || m.userData.float) dyn = true; });
+    g.traverse(m => { if (m.userData.flame || m.userData.float || m.userData.spin) dyn = true; });
     if (!dyn) { statics.push(g); continue; }
     R.root.add(g);
-    g.traverse(m => { if (m.userData.flame) W.flames.push({ m, s: m.scale.clone(), ph: rnd(6) }); if (m.userData.float) W.floats.push({ m, y: m.position.y, ph: m.userData.float }); });
+    g.traverse(m => { if (m.userData.flame) W.flames.push({ m, s: m.scale.clone(), ph: rnd(6) }); if (m.userData.float) W.floats.push({ m, y: m.position.y, ph: m.userData.float }); if (m.userData.spin) W.spins.push(m); });
     if (p.barrier !== undefined) W.barrierProps.push({ g, gate: p.barrier });
   }
   for (const m of M.mergeStatic(statics)) R.root.add(m);
@@ -173,7 +174,7 @@ function respawn() {
 function startAttack(mx, my, moving) {
   let a = P.face;
   if (S.t - input.mouseT < 2.5 && !document.body.classList.contains('touch')) {
-    const [wx, wy] = R.toWorld(input.mx, input.my); a = Math.atan2(wy - (P.y - 0.5), wx - P.x);
+    const [hx, hy] = R.toScreen(P.x, P.y, 1.0), [wx, wy] = R.toWorld(input.mx - hx + R.toScreen(P.x, P.y)[0], input.my - hy + R.toScreen(P.x, P.y)[1]); a = Math.atan2(wy - P.y, wx - P.x);
   } else {
     let best = null, bd = 3.6;
     for (const e of W.enemies) { const d = dist(P.x, P.y, e.x, e.y) - e.r; if (!e.dead && e.state !== 'sleep' && d < bd) { bd = d; best = e; } }
@@ -209,8 +210,9 @@ function updatePlayer(dt) {
   if (keys.has('KeyW') || keys.has('ArrowUp')) my -= 1;
   if (keys.has('KeyS') || keys.has('ArrowDown')) my += 1;
   mx += input.sx; my += input.sy;
-  const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
+  let ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
   const moving = ml > 0.12;
+  [mx, my] = [mx * CY + my * SY, -mx * SY + my * CY];     // the camera is turned: up on screen is not north
   p.inv = Math.max(0, p.inv - dt); p.dashCd -= dt; p.atkCd -= dt; p.comboT -= dt;
   if (input.dash) {
     input.dash = false;
@@ -249,16 +251,17 @@ function poseHero(dt) {
   const p = P, m = p.m, speed = S.mode === 'play' ? Math.hypot(p.vx, p.vy) : 0;
   place(m.g, p.x, p.y); m.g.rotation.y = rotY(p.face);
   m.body.position.y = speed > 0.5 ? Math.abs(Math.sin(p.walk)) * 0.07 : Math.sin(S.t * 2) * 0.015;
+  const sw = speed > 0.5 ? Math.sin(p.walk) * 0.75 : 0; m.legs[0].rotation.x = sw; m.legs[1].rotation.x = -sw;
   m.body.rotation.x = p.dashT > 0 ? 0.55 : Math.min(0.2, speed * 0.04);
-  m.scarf.forEach((s, i) => { s.position.x = -0.12 + Math.sin(S.t * 7 - i * 0.9) * (0.04 + i * 0.03); s.position.y = 1.16 + Math.sin(S.t * 5 - i) * 0.03 + Math.min(0.3, speed * 0.03) * i * 0.4; });
+  m.scarf.forEach((s, i) => { s.position.x = -0.12 + Math.sin(S.t * 7 - i * 0.9) * (0.04 + i * 0.03); s.position.y = 1.84 + Math.sin(S.t * 5 - i) * 0.03 + Math.min(0.3, speed * 0.03) * i * 0.4; });
   const el = p.atkDur - p.atkT, spin = p.combo === 3;
   if (p.atkT > 0 && S.mode === 'play') {
     const k = clamp(el / p.atkDur, 0, 1), dir = p.combo === 2 ? -1 : 1;
     m.armR.rotation.set(-0.1, spin ? k * Math.PI * 2 : dir * lerp(1.7, -1.7, k), 0);
-    m.arc.visible = !spin && el > 0.03 && el < 0.17; m.arc.scale.setScalar(1.35 + k * 0.5); m.arc.scale.y *= dir;
+    m.arc.visible = !spin && el > 0.03 && el < 0.17; m.arc.scale.setScalar(1.5 + k * 0.5); m.arc.scale.y *= dir;
     m.spin.visible = spin && el > 0.04 && el < 0.26; m.spin.scale.setScalar(0.9 + k * 1.3);
-  } else { m.armR.rotation.set(0.42 + Math.sin(p.walk) * 0.12, 0.25, 0); m.arc.visible = m.spin.visible = false; }
-  m.armL.rotation.x = -0.25 + Math.sin(p.walk + 1) * 0.1;
+  } else { m.armR.rotation.set(-1.2 - sw * 0.1, 0.12, 0); m.arc.visible = m.spin.visible = false; }
+  m.armL.rotation.x = -0.2 + sw * 0.2;
   if (S.mode !== 'dead') m.g.visible = !(p.inv > 0 && p.dashT <= 0 && Math.floor(S.t * 22) % 2 === 0);
 }
 function enterLand(i) {
@@ -448,7 +451,7 @@ function updateBoss(e, dt) {
   o.hands.forEach((h, i) => {
     const sl = W.slams.find(s => s.hand === i && s.set && s.t < s.dur + 0.5);
     let tx = (i ? 1 : -1) * 2.7, ty = 1.5 + Math.sin(S.t * 2 + i * 2) * 0.2, tz = 0.5;
-    if (sl) { tx = sl.x - e.x; tz = (sl.y - e.y) / SIN; ty = sl.t < sl.dur ? 3.4 : -0.3 - hov; }
+    if (sl) { tx = sl.x - e.x; tz = sl.y - e.y; ty = sl.t < sl.dur ? 3.4 : -0.3 - hov; }
     const k = Math.min(1, (sl && sl.t >= sl.dur ? 40 : 7) * dt);
     h.position.x = lerp(h.position.x, tx, k); h.position.y = lerp(h.position.y, ty, k); h.position.z = lerp(h.position.z, tz, k);
   });
@@ -551,6 +554,7 @@ function updateWorld(dt) {
     bc.core.rotation.y += dt * (land.lit ? 2 : 0.4 + bc.channel * 5);
   }
   for (const f of W.flames) { const k = 0.85 + Math.sin(S.t * 9 + f.ph) * 0.12 + Math.sin(S.t * 23 + f.ph * 2) * 0.06; f.m.scale.set(f.s.x * (2 - k), f.s.y * k, f.s.z * (2 - k)); }
+  for (const m of W.spins) m.rotation.z += dt * m.userData.spin * (1 + 0.4 * Math.sin(S.t * 0.5));
   for (const f of W.floats) { f.m.position.y = f.y + Math.sin(S.t * 0.9 + f.ph) * 0.25; f.m.rotation.y += dt * 0.3; }
   for (const s of W.shots) {
     s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; place(s.g, s.x, s.y); s.g.rotation.y += dt * 8;
@@ -608,7 +612,7 @@ function ending() {
 }
 
 // ---------------------------------------------------------------- frame
-const zoomBright = () => clamp((0.95 - S.zoom) / 0.5, 0, 1);
+const zoomBright = () => clamp((0.95 - S.zoom) / 0.55, 0, 1);
 function fillUniforms() {
   const u = R.u, env = S.env;
   const Ls = [];
@@ -629,10 +633,10 @@ function fillUniforms() {
   }
   const pts = R.points; let pi = 0;
   const setP = (x, y, h, col, int, d) => { if (pi < pts.length) { const p = pts[pi++]; place(p, x, y, h); p.color.setRGB(col[0], col[1], col[2]); p.intensity = int; p.distance = d; } };
-  if (S.mode !== 'dead') setP(P.x, P.y + 0.3, 1.3, [1, 0.88, 0.7], 9 * fl, env.lightR + 2.5);
+  if (S.mode !== 'dead') setP(P.x + SY * 0.4, P.y + CY * 0.4, 1.5, [1, 0.88, 0.7], 9 * fl, env.lightR + 2.5);
   let n1 = null, n2 = null, d1 = 1e9, d2 = 1e9;
   for (const l of W.lamps) { const d = dist(l.x, l.y, S.camX, S.camY); if (d < d1) { d2 = d1; n2 = n1; d1 = d; n1 = l; } else if (d < d2) { d2 = d; n2 = l; } }
-  for (const l of [n1, n2]) if (l) setP(l.x, l.y + 0.3, 1.9, l.col, 6, 6);
+  for (const l of [n1, n2]) if (l) setP(l.x + SY * 0.3, l.y + CY * 0.3, 1.9, l.col, 6, 6);
   while (pi < pts.length) pts[pi++].intensity = 0;
   const er = [];
   for (const e of W.enemies) { if (e.dead) continue; const d = dist(e.x, e.y, P.x, P.y); if (d < 40) er.push([e.x, e.y, e.er * e.grow * (e.state === 'sleep' ? 0.75 : 1), d]); }
@@ -645,7 +649,7 @@ function fillUniforms() {
   for (let i = 0; i < 4; i++) { const l = W.lines[i]; if (l && l.t >= 0) u.uLine.value[i].set(l.pos, l.dir, l.hw, l.t < l.tele ? 0.3 + 0.3 * (Math.floor(l.t * 12) % 2) + l.t / l.tele * 0.3 : 2.2); else u.uLine.value[i].set(0, 0, 0, 0); }
   // pulling the camera back turns the lights up, so the map can be read
   const k = S.amb + zoomBright() * 0.85, a = env.amb;
-  u.uMap.value = clamp((0.6 - S.zoom) / 0.3, 0, 1);
+  u.uMap.value = clamp((0.5 - S.zoom) / 0.25, 0, 1);
   u.uAmbient.value.set(a[0] + k * 0.75, a[1] + k * 0.72, a[2] + k * 0.66);
   u.uBg.value.set(env.bg[0], env.bg[1], env.bg[2]);
   u.uDark.value = env.dark * (1 - zoomBright()) - zoomBright() * 0.55;
@@ -678,7 +682,7 @@ function updateOverlay() {
   }
   el.style.display = shown ? 'block' : 'none';
   // map labels once the camera is far enough back
-  const far = clamp((0.42 - S.zoom) / 0.12, 0, 1), map = $('map');
+  const far = clamp((0.36 - S.zoom) / 0.1, 0, 1), map = $('map');
   map.style.opacity = S.mode === 'play' || S.mode === 'title' ? far : 0;
   if (far > 0) {
     W.lands.forEach((land, i) => {
@@ -713,17 +717,16 @@ function camera(dt) {
   // zoom
   if (keys.has('Equal') || keys.has('NumpadAdd')) S.zoomTo *= Math.pow(2.2, dt);
   if (keys.has('Minus') || keys.has('NumpadSubtract')) S.zoomTo *= Math.pow(2.2, -dt);
-  S.zMin = Math.min(R.W / (SIZE[0] * R.U0), R.H / (SIZE[1] * R.U0)) * 0.97;
+  S.zMin = Math.min(R.W / ((SIZE[0] * CY + SIZE[1] * SY) * R.U0), R.H / ((SIZE[0] * SY + SIZE[1] * CY) * SINP * R.U0)) * 0.97;
   S.zoomTo = clamp(S.zoomTo, S.zMin, 1.7);
   S.zoom = Math.abs(S.zoomTo - S.zoom) < 0.002 ? S.zoomTo : S.zoom * Math.pow(S.zoomTo / S.zoom, Math.min(1, dt * 9));
   R.setZoom(S.zoom);
-  let tx = P.x + Math.cos(P.face) * 0.5, ty = P.y + Math.sin(P.face) * 0.4 - 0.55;
-  if ((W.bossState === 'fight' || W.bossState === 'dying') && W.boss) { tx = lerp(P.x, W.boss.x, 0.38); ty = lerp(P.y, W.boss.y, 0.38) - 1.1; }
-  if (S.mode === 'title') { tx = W.B.start.x + 6 + Math.sin(S.t * 0.15) * 3; ty = W.B.start.y - 4 + Math.cos(S.t * 0.11) * 1.2; }
-  // far back, keep the page on screen instead of the dark around it
-  const [vw, vh] = R.viewUnits(), kk = clamp((0.8 - S.zoom) / 0.3, 0, 1);
-  const bx = vw >= SIZE[0] ? SIZE[0] / 2 : clamp(tx, vw / 2, SIZE[0] - vw / 2), by = vh >= SIZE[1] ? SIZE[1] / 2 : clamp(ty, vh / 2, SIZE[1] - vh / 2);
-  tx = lerp(tx, bx, kk); ty = lerp(ty, by, kk);
+  let tx = P.x + Math.cos(P.face) * 0.5 - SY * 0.9, ty = P.y + Math.sin(P.face) * 0.5 - CY * 0.9;
+  if ((W.bossState === 'fight' || W.bossState === 'dying') && W.boss) { tx = lerp(P.x, W.boss.x, 0.38) - SY * 1.6; ty = lerp(P.y, W.boss.y, 0.38) - CY * 1.6; }
+  if (S.mode === 'title') { tx = W.B.start.x + 9 + Math.sin(S.t * 0.15) * 4; ty = W.B.start.y - 5 + Math.cos(S.t * 0.11) * 2; }
+  // far back, centre on the page instead of the hero
+  const kk = clamp((0.34 - S.zoom) / Math.max(0.01, 0.34 - S.zMin), 0, 1);
+  tx = lerp(tx, SIZE[0] / 2, kk * kk); ty = lerp(ty, SIZE[1] / 2, kk * kk);
   S.camX += (tx - S.camX) * Math.min(1, 5 * dt); S.camY += (ty - S.camY) * Math.min(1, 5 * dt);
 }
 let last = performance.now();
@@ -750,7 +753,7 @@ function bind() {
     if (e.code === 'KeyJ' || e.code === 'Space') { input.attack = true; input.held = true; }
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyK') input.dash = true;
     if (e.code === 'KeyM') toggleSound();
-    if (e.code === 'KeyZ') S.zoomTo = S.zoomTo < 0.5 ? 0.85 : S.zMin;
+    if (e.code === 'KeyZ') S.zoomTo = S.zoomTo < 0.5 ? 1.05 : S.zMin;
     if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
   });
   addEventListener('keyup', (e) => { keys.delete(e.code); if (e.code === 'KeyJ' || e.code === 'Space') input.held = false; });
@@ -787,7 +790,7 @@ function bind() {
   $('pz').addEventListener('click', togglePause);
   $('zin').addEventListener('click', () => zoomBy(1.5));
   $('zout').addEventListener('click', () => zoomBy(1 / 1.5));
-  $('zmap').addEventListener('click', () => { S.zoomTo = S.zoomTo < 0.5 ? 0.85 : S.zMin; });
+  $('zmap').addEventListener('click', () => { S.zoomTo = S.zoomTo < 0.5 ? 1.05 : S.zMin; });
   $('resume').addEventListener('click', togglePause);
   $('quit').addEventListener('click', () => location.reload());
   $('again').addEventListener('click', () => { clearSave(); location.reload(); });
@@ -804,7 +807,7 @@ function startGame(cont) {
   S.runT = 0; S.deaths = 0; S.mode = 'play';
   const sv = cont && readSave();
   if (sv) { applySave(sv); S.land = -1; enterLand(W.T.regAt(P.x, P.y)); }
-  else { clearSave(); S.land = -1; enterLand(0); }
+  else { clearSave(); S.land = -1; enterLand(0); after(8.5, () => say('Scroll to zoom. Press Z or MAP to see the whole world.', 3.4)); }
   $('hint').textContent = 'WHEEL ZOOM · WASD MOVE · CLICK STRIKE · SHIFT DASH';
   setTimeout(() => { $('hint').textContent = ''; }, 30000);
 }
