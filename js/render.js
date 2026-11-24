@@ -5,7 +5,8 @@ import * as THREE from '../lib/three.module.min.js';
 
 export const PITCH = 50 * Math.PI / 180;
 export const SIN = Math.sin(PITCH), COS = Math.cos(PITCH);
-export const CPU = 8;               // coarse ground cells per world unit
+import { CPU } from './terrain.js';
+export { CPU };
 export const MAX_LIGHTS = 14, MAX_ERASE = 16, MAX_PULSE = 8;
 
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace';
@@ -38,9 +39,9 @@ const FRAG = `
 precision highp float;
 uniform sampler2D tObj, tRefl, tTerrain, tAtlasF, tAtlasC;
 uniform vec2 uRes, uOrigin, uFine, uObj0, uObjSize, uTerSize, uPlayer;
-uniform float uU, uC, uTime, uReveal, uFlash, uWeatherAmt, uHasWater, uDark, uBloom;
+uniform float uU, uC, uTime, uReveal, uFlash, uWeatherAmt, uHasWater, uDark, uBloom, uStride, uMap;
 uniform int uWeather;
-uniform vec3 uPal[16];
+uniform vec3 uPal[80];
 uniform vec4 uLights[${MAX_LIGHTS}];
 uniform vec3 uLightCol[${MAX_LIGHTS}];
 uniform vec3 uErase[${MAX_ERASE}];
@@ -81,21 +82,39 @@ void main(){
 
   vec2 cc = floor(wp / uC), cuv = fract(wp / uC);
   vec2 ccu = (cc + 0.5) * uC / uU;
+  int lp = 0;
+  // when zoomed out one glyph stands for a block of ground cells
+  vec2 gcell = cc;
+  cc = cc * uStride + floor(uStride * 0.5);
   float hc = hash(cc), hc2 = hash(cc + 17.3);
   bool inb = cc.x >= 0.0 && cc.y >= 0.0 && cc.x < uTerSize.x && cc.y < uTerSize.y;
   vec4 t = inb ? texelFetch(tTerrain, ivec2(cc), 0) : vec4(0.0);
+  if (uStride > 2.5 && t.a < 0.5) {   // far away: if any part of the block is road, show road
+    for (int k = 0; k < 4; k++) {
+      vec2 c2 = gcell * uStride + floor(uStride * vec2(k == 0 || k == 2 ? 0.2 : 0.8, k < 2 ? 0.2 : 0.8));
+      if (c2.x < 0.0 || c2.y < 0.0 || c2.x >= uTerSize.x || c2.y >= uTerSize.y) continue;
+      vec4 t2 = texelFetch(tTerrain, ivec2(c2), 0);
+      if (t2.a >= 0.5) { t = t2; break; }
+    }
+  }
   float code = floor(t.r * 255.0 + 0.5);
   int pal = int(t.g * 255.0 + 0.5);
   float bri = t.b * 1.6;
   int kind = int(t.a * 255.0 + 0.5);
+  bool walkable = kind >= 128;
+  if (walkable) kind -= 128;
+  // map view: roads and places stand out, the wilds fall back, nothing is left blank
+  bri *= walkable ? 1.0 + uMap * 1.1 : 1.0 - uMap * 0.25;
+  if (uMap > 0.3 && code == 0.0 && inb) code = walkable ? ch(43) : ch(46);
   vec3 col = uPal[pal];
+  lp = (pal / 16) * 16;
 
   // ---- animated ground kinds
   if (kind == 1) {            // water
     float w = sin(uTime * 1.25 + cc.x * 0.5 + sin(cc.y * 0.7 + uTime * 0.35) * 1.6 + hc * 1.2);
     code = w > 0.55 ? ch(126) : (w > -0.15 ? ch(45) : (hc > 0.6 ? ch(95) : ch(32)));
     bri *= 0.55 + 0.45 * (w * 0.5 + 0.5);
-    if (w > 0.86) col = uPal[6];
+    if (w > 0.86) col = uPal[lp + 6];
   } else if (kind == 2) {     // grass that sways and bends away from the player
     float wind = sin(uTime * 1.7 + cc.x * 0.33 + cc.y * 0.21 + hc * 2.0);
     if (wind > 0.72) code = ch(47); else if (wind < -0.78) code = ch(92);
@@ -107,7 +126,7 @@ void main(){
     bri *= 0.65 + 0.6 * f;
   } else if (kind == 4) {     // snow glitter
     float s = step(0.985, fract(hc + uTime * 0.21 + hc2));
-    if (s > 0.5) { code = ch(42); bri = 1.6; col = uPal[13]; }
+    if (s > 0.5) { code = ch(42); bri = 1.6; col = uPal[lp + 13]; }
   } else if (kind == 5) {     // glowing writing
     bri *= 0.75 + 0.35 * sin(uTime * 2.0 + cc.x * 0.25 + cc.y * 0.1);
   } else if (kind == 6) {     // void static: glyphs flicker in and out
@@ -164,7 +183,7 @@ void main(){
       float rl = max(rf.r, max(rf.g, rf.b));
       int idx = int(clamp(pow(rl, 0.7) * float(RN) * 0.8, 1.0, float(RN - 1)));
       float m = glyph(tAtlasF, float(RAMP[idx]), fuv);
-      outc = uBg + mix(uPal[5], rf.rgb / max(rl, 0.001), 0.45) * (0.16 + 0.42 * rl) * m;
+      outc = uBg + mix(uPal[lp + 5], rf.rgb / max(rl, 0.001), 0.45) * (0.16 + 0.42 * rl) * m;
     }
   }
 
@@ -216,7 +235,7 @@ void main(){
   vec2 q = sp / uRes - 0.5;
   outc *= 1.0 - dot(q, q) * (0.9 + uDark);
   outc += vec3(0.6, 0.04, 0.1) * uFlash * (0.04 + dot(q, q) * 1.5);
-  if (hash(cc * 1.37 + 3.1) > uReveal) outc = uBg * 0.5;
+  if (hash(gcell * 1.37 + 3.1) > uReveal) outc = uBg * 0.5;
   gl_FragColor = vec4(outc, 1.0);
 }`;
 
@@ -249,9 +268,9 @@ export class Renderer {
       uRes: U(new THREE.Vector2()), uOrigin: U(new THREE.Vector2()), uFine: U(new THREE.Vector2()),
       uObj0: U(new THREE.Vector2()), uObjSize: U(new THREE.Vector2()), uTerSize: U(new THREE.Vector2()),
       uPlayer: U(new THREE.Vector2()),
-      uU: U(1), uC: U(1), uTime: U(0), uReveal: U(1), uFlash: U(0), uWeatherAmt: U(0), uHasWater: U(0), uDark: U(0), uBloom: U(0.16),
+      uU: U(1), uC: U(1), uTime: U(0), uReveal: U(1), uFlash: U(0), uWeatherAmt: U(0), uHasWater: U(1), uDark: U(0), uBloom: U(0.16), uStride: U(1), uMap: U(0),
       uWeather: U(0),
-      uPal: U(Array.from({ length: 16 }, () => new THREE.Vector3(1, 1, 1))),
+      uPal: U(Array.from({ length: 80 }, () => new THREE.Vector3(1, 1, 1))),
       uLights: U(Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4())),
       uLightCol: U(Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector3())),
       uErase: U(Array.from({ length: MAX_ERASE }, () => new THREE.Vector3())),
@@ -273,9 +292,10 @@ export class Renderer {
     this.W = W; this.H = H; this.dpr = dpr;
     this.r.setSize(W, H, false);
     this.canvas.style.width = innerWidth + 'px'; this.canvas.style.height = innerHeight + 'px';
-    this.U = Math.max(40, Math.min(W / 7.4, H / 6.6));
-    this.C = this.U / CPU;
-    this.fw = this.C / this.density; this.fh = this.fw * 1.5;
+    this.U0 = Math.max(40, Math.min(W / 7.4, H / 6.6));
+    this.C0 = this.U0 / CPU;
+    this.fw = this.C0 / this.density; this.fh = this.fw * 1.5;
+    this.setZoom(this.zoom || 1);
     this.cols = Math.ceil(W / this.fw) + 2; this.rows = Math.ceil(H / this.fh) + 2;
     const opts = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: true, type: THREE.UnsignedByteType };
     if (this.rtObj) { this.rtObj.dispose(); this.rtRefl.dispose(); }
@@ -284,12 +304,20 @@ export class Renderer {
     if (this.atlasF) { this.atlasF.dispose(); this.atlasC.dispose(); }
     const k = 2;
     this.atlasF = makeAtlas(Math.max(6, Math.round(this.fw * k)), Math.max(9, Math.round(this.fh * k)), 800);
-    this.atlasC = makeAtlas(Math.max(8, Math.round(this.C * 0.58 * k)), Math.max(12, Math.round(this.C * 0.84 * k)), 500);
+    this.atlasC = makeAtlas(Math.max(8, Math.round(this.C0 * 0.58 * k * 1.3)), Math.max(12, Math.round(this.C0 * 0.84 * k * 1.3)), 500);
     const u = this.u;
     u.tObj.value = this.rtObj.texture; u.tRefl.value = this.rtRefl.texture;
     u.tAtlasF.value = this.atlasF; u.tAtlasC.value = this.atlasC;
-    u.uRes.value.set(W, H); u.uU.value = this.U; u.uC.value = this.C; u.uFine.value.set(this.fw, this.fh);
+    u.uRes.value.set(W, H); u.uFine.value.set(this.fw, this.fh);
     u.uObjSize.value.set(this.cols, this.rows);
+  }
+
+  // zoom < 1 shows more world. Object glyphs keep their pixel size; ground glyphs shrink until one
+  // glyph can stand for a 2x2, 3x3... block of cells, so the page stays readable at any distance.
+  setZoom(z) {
+    this.zoom = z; this.U = this.U0 * z;
+    this.stride = Math.max(1, Math.round(1 / z));
+    this.C = this.stride * this.U / CPU;
   }
 
   setTerrain(terrain) {
@@ -325,6 +353,7 @@ export class Renderer {
     const u = this.u, U = this.U;
     const ox = Math.round(cx * U - this.W / 2 + shakeX), oy = Math.round(cy * U - this.H / 2 + shakeY);
     u.uOrigin.value.set(ox, oy); u.uTime.value = time;
+    u.uU.value = U; u.uC.value = this.C; u.uStride.value = this.stride;
     const i0 = Math.floor(ox / this.fw), j0 = Math.floor(oy / this.fh);
     u.uObj0.value.set(i0, j0);
     const cam = this.cam;

@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>UNWRITTEN — an ASCII action tale in five chapters</title>
+<title>UNWRITTEN — an ASCII action game, one small world of five lands</title>
 <meta name="description" content="Something is deleting the world one word at a time. Collect the letters, write it back. A browser game drawn entirely in text.">
 <meta property="og:title" content="UNWRITTEN">
-<meta property="og:description" content="An ASCII action tale in five chapters. Plays in the browser.">
+<meta property="og:description" content="An ASCII action game: one small open world of five lands. Plays in the browser.">
 <meta name="theme-color" content="#05060c">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 fill=%27%2305060c%27/%3E%3Ctext x=%2716%27 y=%2724%27 font-family=%27monospace%27 font-weight=%27bold%27 font-size=%2724%27 text-anchor=%27middle%27 fill=%27%23fff1c9%27%3EU%3C/text%3E%3C/svg%3E">
 <style>
@@ -27,7 +27,16 @@ body { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; fon
 #word i { font-style: normal; color: #4a4668; text-shadow: none; }
 #word.done { animation: pulse 1.2s ease-in-out 3; }
 @keyframes pulse { 50% { color: #fff; text-shadow: 0 0 26px #fff1c9; } }
-#tools { position: absolute; top: max(12px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); display: flex; gap: 8px; pointer-events: auto; }
+#lanterns { margin-top: 8px; font-size: 15px; letter-spacing: .2em; color: var(--gold); }
+#lanterns i { font-style: normal; color: #4a4668; }
+#lanterns small { font-size: 10px; letter-spacing: .2em; color: var(--dim); }
+#map { opacity: 0; transition: opacity .25s; }
+.ml { position: absolute; left: 0; top: 0; font-size: clamp(10px, 1.3vw, 14px); letter-spacing: .16em; color: #fff; text-align: center; white-space: nowrap; text-shadow: 0 0 6px #000, 0 0 12px #000, 0 0 2px #000; will-change: transform; }
+.ml b { color: var(--pink); }
+.ml small { display: block; margin-top: 3px; font-size: .8em; color: var(--dim); }
+.ml.lit small { color: var(--gold); }
+#you { position: absolute; left: 0; top: 0; font-size: 11px; font-weight: 800; letter-spacing: .14em; line-height: 1.1; text-align: center; color: var(--gold); text-shadow: 0 0 6px #000, 0 0 2px #000; animation: blink 1s steps(2) infinite; will-change: transform; }
+#tools { position: absolute; top: max(12px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); display: flex; gap: 6px; pointer-events: auto; flex-wrap: wrap; justify-content: flex-end; max-width: 60vw; }
 button, a.btn { font: inherit; text-decoration: none; display: inline-block; color: var(--ink); background: rgba(10,11,22,.72); border: 1px solid #3a3860; padding: 8px 12px; cursor: pointer; letter-spacing: .12em; font-size: 12px; }
 button:hover, button:focus-visible, a.btn:hover, a.btn:focus-visible { border-color: var(--gold); color: var(--gold); outline: none; }
 #boss { position: absolute; left: 50%; top: max(16px, env(safe-area-inset-top)); transform: translateX(-50%); width: min(520px, 62vw); text-align: center; display: none; }
@@ -46,10 +55,8 @@ h1 { margin: 0; font-weight: 800; font-size: clamp(34px, 9.4vw, 118px); letter-s
 h1 s { color: var(--red); text-decoration-thickness: .06em; text-decoration-color: var(--red); }
 .tag { margin-top: 18px; font-size: clamp(11px, 1.6vw, 15px); letter-spacing: .3em; color: var(--pink); }
 .lead { margin-top: 26px; max-width: 620px; font-size: clamp(12px, 1.5vw, 15px); line-height: 1.7; color: #c8c4e0; }
-.go { margin-top: 30px; font-size: 15px; padding: 14px 30px; border-color: var(--gold); color: var(--gold); letter-spacing: .3em; animation: blink 1.6s steps(2) infinite; }
+.go { margin-top: 26px; font-size: 15px; padding: 14px 30px; border-color: var(--gold); color: var(--gold); letter-spacing: .3em; animation: blink 1.6s steps(2) infinite; }
 @keyframes blink { 50% { opacity: .55; } }
-#chapters { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-#chapters button[disabled] { opacity: .3; cursor: default; }
 .keys { margin-top: 26px; font-size: 11px; letter-spacing: .14em; color: var(--dim); line-height: 2; }
 #card { background: rgba(5,6,12,.0); transition: opacity .5s; }
 #card .n { font-size: clamp(12px, 1.8vw, 16px); letter-spacing: .5em; color: var(--pink); }
@@ -80,12 +87,15 @@ body.touch #msg { bottom: 27%; }
   <div id="chapter"></div>
   <div id="hearts" aria-label="health"></div>
   <div id="word" aria-label="word to write"></div>
-  <div id="tools"><button id="snd" type="button" aria-label="toggle sound">SOUND ON</button><button id="pz" type="button" aria-label="pause">II</button></div>
+  <div id="lanterns" aria-label="lanterns lit"></div>
+  <div id="tools"><button id="zout" type="button" aria-label="zoom out">&minus;</button><button id="zmap" type="button" aria-label="toggle map view">MAP</button><button id="zin" type="button" aria-label="zoom in">+</button><button id="snd" type="button" aria-label="toggle sound">SOUND ON</button><button id="pz" type="button" aria-label="pause">II</button></div>
   <div id="boss"><b>THE EDITOR</b><div id="bossbar"><div></div></div></div>
   <div id="arrow">&gt;<small></small></div>
   <div id="msg"></div>
   <div id="hint"></div>
 </div>
+
+<div id="map" class="layer"><div class="ml"></div><div class="ml"></div><div class="ml"></div><div class="ml"></div><div class="ml"></div><div id="you">YOU<br>&#9660;</div></div>
 
 <div id="touch" class="layer">
   <div id="stick"><div id="base"><div id="knob"></div></div></div>
@@ -97,11 +107,11 @@ body.touch #msg { bottom: 27%; }
 
 <div id="title" class="screen on">
   <h1>UN<s>WRITTEN</s></h1>
-  <div class="tag">AN ASCII ACTION TALE IN FIVE CHAPTERS</div>
-  <div class="lead">Something is deleting the world, one word at a time. You are the last Scribe. Find the letters, beat what guards them, and write the world back.</div>
-  <button id="start" class="go" type="button">BEGIN</button>
-  <div id="chapters"></div>
-  <div class="keys" id="keys">WASD / ARROWS move &nbsp;·&nbsp; CLICK / J strike &nbsp;·&nbsp; SHIFT / K / RIGHT CLICK dash &nbsp;·&nbsp; M sound &nbsp;·&nbsp; ESC pause</div>
+  <div class="tag">AN ASCII ACTION GAME &middot; ONE SMALL WORLD &middot; FIVE LANDS</div>
+  <div class="lead">Something is deleting the world, one word at a time. You are the last Scribe. Walk the five lands in any order, find the letters, beat what guards them, and write the world back.</div>
+  <div id="loading" class="tag" style="margin-top:30px;color:var(--gold)">WRITING THE WORLD...</div>
+  <div class="row" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center"><button id="cont" class="go" type="button" style="display:none">CONTINUE</button><button id="start" class="go" type="button" style="visibility:hidden">NEW GAME</button></div>
+  <div class="keys" id="keys">WASD / ARROWS move &nbsp;·&nbsp; CLICK / J strike &nbsp;·&nbsp; SHIFT / K / RIGHT CLICK dash<br>MOUSE WHEEL or + &minus; zoom &nbsp;·&nbsp; Z map &nbsp;·&nbsp; M sound &nbsp;·&nbsp; ESC pause</div>
 </div>
 
 <div id="pause" class="screen"><div class="t" style="font-size:32px;font-weight:800;letter-spacing:.3em">PAUSED</div><div class="row" style="margin-top:22px;display:flex;gap:10px"><button id="resume" type="button">RESUME</button><button id="quit" type="button">TITLE</button></div></div>

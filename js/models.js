@@ -241,3 +241,33 @@ export function makeProp(p) {
   return g;
 }
 export function makeChunk(hex) { return new THREE.Mesh(G.tet, glow(hex)); }
+
+// Bake many motionless props into a few meshes (one per material per map chunk) so the whole
+// world can be on screen at once when the camera pulls back.
+export function mergeStatic(groups) {
+  const by = new Map(), v = new THREE.Vector3(), nm = new THREE.Matrix3();
+  for (const g of groups) {
+    g.updateMatrixWorld(true);
+    const key = Math.floor(g.position.x / 32) + '|' + Math.floor(g.position.z / 40);
+    g.traverse(m => { if (!m.isMesh) return; const k = m.material.uuid + '|' + key; if (!by.has(k)) by.set(k, { mat: m.material, list: [] }); by.get(k).list.push(m); });
+  }
+  const out = [];
+  for (const { mat, list } of by.values()) {
+    let n = 0; for (const m of list) n += m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count;
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+    for (const m of list) {
+      const P = m.geometry.attributes.position, Nn = m.geometry.attributes.normal, idx = m.geometry.index, cnt = idx ? idx.count : P.count;
+      nm.getNormalMatrix(m.matrixWorld);
+      for (let i = 0; i < cnt; i++) {
+        const k = idx ? idx.getX(i) : i;
+        v.fromBufferAttribute(P, k).applyMatrix4(m.matrixWorld); pos[o] = v.x; pos[o + 1] = v.y; pos[o + 2] = v.z;
+        v.fromBufferAttribute(Nn, k).applyMatrix3(nm).normalize(); nor[o] = v.x; nor[o + 1] = v.y; nor[o + 2] = v.z; o += 3;
+      }
+    }
+    const bg = new THREE.BufferGeometry();
+    bg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); bg.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    bg.computeBoundingSphere();
+    const mesh = new THREE.Mesh(bg, mat); mesh.matrixAutoUpdate = false; out.push(mesh);
+  }
+  return out;
+}
