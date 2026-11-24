@@ -1044,6 +1044,7 @@ function camera(dt) {
   // far back, centre on the page instead of the hero
   const kk = clamp((0.34 - S.zoom) / Math.max(0.01, 0.34 - S.zMin), 0, 1);
   tx = lerp(tx, SIZE[0] / 2, kk * kk); ty = lerp(ty, SIZE[1] / 2, kk * kk);
+  tx += S.offX || 0; ty += S.offY || 0;
   S.camX += (tx - S.camX) * Math.min(1, 5 * dt); S.camY += (ty - S.camY) * Math.min(1, 5 * dt);
 }
 let last = performance.now();
@@ -1150,7 +1151,7 @@ async function boot() {
     audio.pending = LANDS[0].music;
     requestAnimationFrame(frame);
     const q = new URLSearchParams(location.search);
-    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire, castFire, castBolt, gainXP, nextWeapon, tick, setWeapon, say };
+    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire, castFire, castBolt, gainXP, nextWeapon, tick, setWeapon, say, audio };
   } catch (err) {
     console.error(err); $('err').style.display = 'flex'; $('title').classList.remove('on');
   }
