@@ -13,12 +13,24 @@ Something is deleting the world one word at a time. You are the last Scribe. The
 | Move | WASD or arrows | left thumb |
 | Strike (three-hit combo, third is a spin) | click, J or Space | STRIKE |
 | Dash (brief invulnerability) | Shift, K or right click | DASH |
+| Switch weapon | Q | WPN |
+| Cast fire / lightning | 1 / 2 | FLAME / BOLT |
 | Call your horse / get down | R | HORSE |
 | Climb a tower, climb down, talk | E | USE |
 | Light a campfire (checkpoint, heals you) | F | FIRE |
 | Zoom | mouse wheel, + and - | pinch, or the + and - buttons |
 | Whole-world map | Z, or the MAP button | MAP |
 | Sound / pause | M / Esc | buttons, top right |
+
+## Weapons, magic, elixirs
+
+- **QUILL** (from the start): quick three-hit combo ending in a spin.
+- **SEAL** (level 2): a heavy stamp. Slow, triple damage, and it shakes the page where it lands.
+- **NIBS** (level 4): twin blades. Short reach, very fast.
+- **FIRE** (key 1, 20 ink): a fireball that bursts and leaves the ground burning. The ground letters themselves turn into `^ * ~` flames and keep hurting whatever stands in them.
+- **BOLT** (key 2, 30 ink, level 3): lightning that jumps between up to four enemies, drawn as jagged `/ \ #` strokes on the ground and in the air.
+- **Elixirs** are scattered over the whole world, about ninety of them: gold gives experience, blue refills ink, red heals. Kills and letters give experience too.
+- Each level adds 20% damage and 10 ink, and every second level adds a point of health. Levels, weapon and collected elixirs are saved.
 
 Striking a red shot sends it back. Striking from the saddle jumps you off swinging. Progress is saved in the browser, so a reload offers CONTINUE.
 

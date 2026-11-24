@@ -48,6 +48,9 @@ uniform sampler2D tRefl, tShadow, tTerrain, tText, tAtlasF, tAtlasC;
 uniform vec2 uRes, uOrigin, uFine, uObj0, uObjSize, uTerSize, uPlayer;
 uniform float uU, uG, uTime, uSeed, uMap, uFineGrass;
 uniform vec4 uRing[6];
+uniform vec4 uBurn[4];
+uniform vec4 uBolt[6];
+uniform float uBoltA;
 uniform vec4 uScar[4];
 uniform vec3 uPal[80];
 uniform float uTextLen[8];
@@ -195,6 +198,22 @@ void main(){
       if (fract(atan(dv.y, dv.x) * max(1.0, rg.z) * 1.9 + uTime * 0.5) > 0.3) { pulse += vec3(1.0, 0.55, 0.15) * rg.w; code = ch(111); fx = 1.0; }
     } else if (d < rg.z) pulse += vec3(0.5, 0.14, 0.04) * rg.w * 0.3 * hc;
   }
+  for (int i = 0; i < 4; i++) {   // burning ground: the letters themselves turn to flame
+    vec4 b = uBurn[i];
+    if (b.w <= 0.0) continue;
+    if (length(w - b.xy) < b.z * (0.75 + 0.35 * hc2)) {
+      float fl = fract(hc + uTime * 3.0 + hc2 * 2.0);
+      pulse += mix(vec3(1.0, 0.32, 0.05), vec3(1.0, 0.85, 0.3), fl) * b.w * (0.55 + 0.7 * fl);
+      code = fl > 0.66 ? ch(94) : (fl > 0.33 ? ch(42) : ch(126)); fx = 1.0;
+    }
+  }
+  if (uBoltA > 0.0) for (int i = 0; i < 6; i++) {   // lightning running along the ground as jagged strokes
+    vec4 s = uBolt[i];
+    if (s.x == 0.0 && s.z == 0.0) continue;
+    vec2 pa = w - s.xy, ba = s.zw - s.xy;
+    float d = length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0)) + (hash(gc + floor(uTime * 40.0)) - 0.5) * 0.7;
+    if (d < 0.34) { pulse += vec3(0.75, 0.92, 1.0) * uBoltA * 1.7; code = hc > 0.66 ? ch(47) : (hc > 0.33 ? ch(92) : ch(35)); fx = 1.0; }
+  }
   float erased = 0.0;
   for (int i = 0; i < ${MAX_ERASE}; i++) {
     vec3 e = uErase[i];
@@ -321,6 +340,7 @@ export class Renderer {
       uObj0: U(new THREE.Vector2()), uObjSize: U(new THREE.Vector2()), uTerSize: U(new THREE.Vector2()), uPlayer: U(new THREE.Vector2()),
       uU: U(1), uG: U(1), uTime: U(0), uReveal: U(1), uFlash: U(0), uWeatherAmt: U(0), uDark: U(0), uSeed: U(0), uMap: U(0), uFineGrass: U(1),
       uRing: U(Array.from({ length: 6 }, () => new THREE.Vector4())),
+      uBurn: U(Array.from({ length: 4 }, () => new THREE.Vector4())), uBolt: U(Array.from({ length: 6 }, () => new THREE.Vector4())), uBoltA: U(0),
       uWeather: U(0),
       uScar: U(Array.from({ length: 4 }, () => new THREE.Vector4())),
       uPal: U(Array.from({ length: 80 }, () => new THREE.Vector3(1, 1, 1))),

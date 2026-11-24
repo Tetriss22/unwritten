@@ -59,6 +59,7 @@ export class Audio {
       case 'spawn': this.tone('sawtooth', 60, 190, 0.5, 0.14); this.noise(0.5, 200, 900, 0.16, 3); break;
       case 'die': this.tone('sawtooth', 220, 30, 1.2, 0.34); this.noise(1.0, 1200, 60, 0.4, 0.5); break;
       case 'bossdie': for (let i = 0; i < 9; i++) { this.tone('sawtooth', 500 - i * 40, 40, 0.5, 0.26, i * 0.16); this.noise(0.4, 2000, 100, 0.34, 0.6, i * 0.16); } break;
+      case 'zap': this.noise(0.25, 6000, 400, 0.5, 0.6); this.tone('sawtooth', 1800, 90, 0.22, 0.25); this.tone('square', 60, 40, 0.3, 0.2, 0.05); break;
       case 'whistle': this.tone('sine', 1300, 2100, 0.16, 0.2); this.tone('sine', 1500, 2500, 0.22, 0.2, 0.2); break;
       case 'hoof': this.noise(0.05, 500, 180, 0.12, 1.2); break;
       case 'fire': this.noise(0.5, 300, 2400, 0.25, 0.8); this.tone('triangle', 220, 440, 0.4, 0.1); break;

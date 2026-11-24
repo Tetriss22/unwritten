@@ -1,7 +1,7 @@
 // UNWRITTEN — game loop, the Scribe, the unwriters, one small world of five lands and the Editor.
 import * as THREE from '../lib/three.module.min.js';
 import { Renderer, SY, CY, SINP, MAX_LIGHTS, MAX_ERASE, MAX_PULSE } from './render.js';
-import { LANDS, SIZE, TEXTS, buildWorld } from './terrain.js';
+import { LANDS, SIZE, TEXTS, buildWorld, rng } from './terrain.js';
 import * as M from './models.js';
 import { gmat } from './glyph.js';
 import { Audio } from './audio.js';
@@ -18,9 +18,9 @@ const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random(
 const audio = new Audio();
 let R = null, W = null;
 const S = { mode: 'boot', land: 0, landT: 0, t: 0, camX: 0, camY: 0, shake: 0, hitstop: 0, flash: 0, reveal: 0, revealTo: 0, amb: 0, deaths: 0, runT: 0, paused: false, timers: [], zoom: 1.0, zoomTo: 1.0, zMin: 0.1, env: null };
-const P = { x: 0, y: 0, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: 5, maxHp: 5, inv: 0, dashT: 0, dashCd: 0, dx: 0, dy: 0, atkT: 0, atkDur: 0.24, atkCd: 0, combo: 0, comboT: 0, hitDone: true, walk: 0, stepT: 0, burnT: 0, cx: 0, cy: 0, m: null, h: 0, hTo: 0, up: null, mounted: false, zoomBack: 1.0 };
+const P = { x: 0, y: 0, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: 5, maxHp: 5, inv: 0, dashT: 0, dashCd: 0, dx: 0, dy: 0, atkT: 0, atkDur: 0.24, atkCd: 0, combo: 0, comboT: 0, hitDone: true, walk: 0, stepT: 0, burnT: 0, cx: 0, cy: 0, m: null, h: 0, hTo: 0, up: null, mounted: false, zoomBack: 1.0, lvl: 1, xp: 0, ink: 60, maxInk: 60, dmgMul: 1, weapon: 0 };
 const keys = new Set();
-const input = { mx: 0, my: 0, mouseT: -99, attack: false, held: false, dash: false, use: false, ride: false, fire: false, sx: 0, sy: 0, stickId: null, ox: 0, oy: 0, pinch: 0 };
+const input = { mx: 0, my: 0, mouseT: -99, attack: false, held: false, dash: false, use: false, ride: false, fire: false, swap: false, s1: false, s2: false, sx: 0, sy: 0, stickId: null, ox: 0, oy: 0, pinch: 0 };
 const after = (sec, fn) => S.timers.push({ t: sec, fn });
 const TRAIL = 12, WHITE3 = new THREE.Color(0xffffff);
 const RB = Array.from({ length: 6 }, () => ({ x: 0, z: 0, vx: 0, vz: 0 }));   // the coat's rings, each on a spring
@@ -30,7 +30,7 @@ const SAVE = 'unwritten.world.v2';
 const readSave = () => { try { return JSON.parse(localStorage.getItem(SAVE) || 'null'); } catch (e) { return null; } };
 const clearSave = () => { try { localStorage.removeItem(SAVE); } catch (e) { /* storage unavailable */ } };
 function save() {
-  try { localStorage.setItem(SAVE, JSON.stringify({ taken: W.letters.filter(l => l.state === 'taken').map(l => l.id), lit: W.lands.map(l => l.lit), cp: [P.cx, P.cy], t: S.runT, d: S.deaths })); } catch (e) { /* storage unavailable */ }
+  try { localStorage.setItem(SAVE, JSON.stringify({ taken: W.letters.filter(l => l.state === 'taken').map(l => l.id), lit: W.lands.map(l => l.lit), cp: [P.cx, P.cy], t: S.runT, d: S.deaths, lvl: P.lvl, xp: P.xp, wp: P.weapon, elx: W.elixirs.filter(e => e.gone).map(e => e.id) })); } catch (e) { /* storage unavailable */ }
 }
 
 // ---------------------------------------------------------------- HUD
@@ -120,9 +120,10 @@ function loadWorld() {
   }
   W.horse = M.makeHorse(); W.horse.x = B.start.x - 2.2; W.horse.y = B.start.y + 1.2; W.horse.face = 0.4; W.horse.call = false; W.horse.gait = 0; R.root.add(W.horse.g);
   W.npcs = B.npcs.map(n => { const g = M.makeNPC(n.hue); place(g, n.x, n.y); R.root.add(g); return { ...n, g, ph: rnd(6) }; });
-  W.fire = null; W.said = {};
+  W.fire = null; W.said = {}; W.fireballs = []; W.burns = []; W.bolts = []; W.skybolts = []; spawnElixirs();
   if (!P.m) P.m = M.makeHero();
   R.root.add(P.m.g); P.m.g.visible = true;
+  P.lvl = 1; P.xp = 0; applyLevel(); P.ink = P.maxInk; setWeapon(0);
   Object.assign(P, { x: B.start.x, y: B.start.y, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: P.maxHp, inv: 0, dashT: 0, atkT: 0, cx: B.start.x, cy: B.start.y, h: 0, hTo: 0, up: null, mounted: false });
   S.camX = P.x; S.camY = P.y; S.land = 0;
   const d = LANDS[0];
@@ -143,6 +144,9 @@ function applySave(sv) {
   R.touchTerrain();
   Object.assign(P, { x: sv.cp[0], y: sv.cp[1], cx: sv.cp[0], cy: sv.cp[1] });
   S.camX = P.x; S.camY = P.y; S.runT = sv.t || 0; S.deaths = sv.d || 0;
+  P.lvl = sv.lvl || 1; P.xp = sv.xp || 0; applyLevel(); P.hp = P.maxHp; P.ink = P.maxInk; hudHearts();
+  for (const e of W.elixirs) if ((sv.elx || []).includes(e.id)) e.gone = true;
+  setWeapon(WEAPONS[sv.wp || 0].lvl <= P.lvl ? sv.wp || 0 : 0);
 }
 function openGate(g, instant = false) {
   if (g.open) return; g.open = true;
@@ -185,6 +189,7 @@ function respawn() {
   }
   W.enemies = W.enemies.filter(e => !e.dead);
   for (const s of W.shots) removeObj(s.g); W.shots = [];
+  for (const f of W.fireballs) removeObj(f.g); W.fireballs = []; W.burns = [];
   W.lines = []; W.slams = [];
   if (W.bossState === 'fight') { W.bossState = 'wait'; W.boss = null; $('boss').style.display = 'none'; audio.intense = false; }
   Object.assign(P, { x: P.cx, y: P.cy, vx: 0, vy: 0, kx: 0, ky: 0, hp: P.maxHp, inv: 1.6, dashT: 0, atkT: 0, up: null, hTo: 0, h: 0, mounted: false });
@@ -254,6 +259,129 @@ function updateHorse(dt) {
   hz.neck.rotation.x = sp > 0.5 ? 0.25 + Math.sin(hz.gait) * 0.08 : Math.sin(S.t * 0.7) * 0.08; hz.tail.rotation.x = -0.5 - Math.min(0.7, sp * 0.07) + Math.sin(S.t * 3) * 0.08;
 }
 
+// ---------------------------------------------------------------- weapons, magic, elixirs, levels
+const WEAPONS = [
+  { name: 'QUILL', dmg: 1, range: 1.8, half: 1.25, dur: 0.22, cd: 0.25, hitAt: 0.28, spin: true, snd: 'slash', lvl: 1 },
+  { name: 'SEAL', dmg: 3, range: 2.4, half: 1.5, dur: 0.44, cd: 0.66, hitAt: 0.55, slam: true, snd: 'spin', lvl: 2 },
+  { name: 'NIBS', dmg: 0.6, range: 1.45, half: 1.0, dur: 0.11, cd: 0.12, hitAt: 0.3, snd: 'slash', lvl: 4 },
+];
+const SPELLS = { fire: { cost: 20, lvl: 1 }, bolt: { cost: 30, lvl: 3 } };
+const ELX = { xp: { col: [1, 0.85, 0.4] }, ink: { col: [0.4, 0.7, 1] }, hp: { col: [1, 0.35, 0.45] } };
+const xpNeed = (l) => 30 + l * 30;
+function applyLevel() { P.dmgMul = 1 + 0.2 * (P.lvl - 1); P.maxHp = 5 + Math.floor(P.lvl / 2); P.maxInk = 60 + 10 * (P.lvl - 1); }
+function hudStats() {
+  const bar = (v, max, n = 10) => { const k = Math.round(clamp(v / max, 0, 1) * n); return '▮'.repeat(k) + '<i>' + '▯'.repeat(n - k) + '</i>'; };
+  $('lv').innerHTML = '<b>LV ' + P.lvl + '</b> ' + bar(P.xp, xpNeed(P.lvl)) + ' <small>' + Math.floor(P.xp) + '/' + xpNeed(P.lvl) + '</small>';
+  $('ink').innerHTML = '<b>INK</b> ' + bar(P.ink, P.maxInk) + ' <small>' + Math.floor(P.ink) + '/' + P.maxInk + '</small>';
+  const sp = (k, key, label) => P.lvl >= SPELLS[k].lvl ? `<span class="${P.ink >= SPELLS[k].cost ? '' : 'off'}">${key} ${label}</span>` : `<span class="off">${key} LV${SPELLS[k].lvl}</span>`;
+  $('slots').innerHTML = '<span>Q ' + WEAPONS[P.weapon].name + '</span>' + sp('fire', '1', 'FIRE') + sp('bolt', '2', 'BOLT');
+}
+function gainXP(n) {
+  P.xp += n;
+  while (P.xp >= xpNeed(P.lvl)) {
+    P.xp -= xpNeed(P.lvl); P.lvl++; applyLevel(); P.hp = P.maxHp; P.ink = P.maxInk; hudHearts();
+    audio.play('word'); pulse(P.x, P.y, [1, 0.9, 0.5], 1.8, 10, 1.0); glow(P.x, P.y, 9, 1.6, [1, 0.9, 0.5], 1.0); burst(P.x, P.y, 1.5, 24, 0xffe9a8, 8);
+    floatText(P.x, P.y, 3.8 + P.h, 'LEVEL ' + P.lvl, 'lvl');
+    const w = WEAPONS.find(w => w.lvl === P.lvl);
+    say('Level ' + P.lvl + '. ' + (w ? 'New weapon: ' + w.name + '. Press Q to switch.' : P.lvl === SPELLS.bolt.lvl ? 'New spell: BOLT. Press 2.' : 'Your hand is heavier and your ink runs deeper.'), 3.4);
+  }
+  hudStats();
+}
+function setWeapon(i) { P.weapon = i; P.m.weapons.forEach((w, k) => { w.g.visible = k === i; }); hudStats(); }
+function nextWeapon() {
+  if (S.mode !== 'play') return; let i = P.weapon;
+  do { i = (i + 1) % WEAPONS.length; } while (WEAPONS[i].lvl > P.lvl);
+  if (i !== P.weapon) { setWeapon(i); audio.play('dash'); floatText(P.x, P.y, 3.4 + P.h, WEAPONS[i].name, 'gain'); } else once('wpn', 'More weapons come with levels. Drink elixirs.', 2.6);
+}
+function aimAngle() {
+  if (S.t - input.mouseT < 2.5 && !document.body.classList.contains('touch')) {
+    const [gx, gy] = R.toScreen(P.x, P.y), [hx, hy] = R.toScreen(P.x, P.y, 1.0 + P.h + (P.mounted ? 0.8 : 0)), [wx, wy] = R.toWorld(input.mx - hx + gx, input.my - hy + gy);
+    return Math.atan2(wy - P.y, wx - P.x);
+  }
+  let best = null, bd = 11; for (const e of W.enemies) { const d = dist(P.x, P.y, e.x, e.y); if (!e.dead && e.state !== 'sleep' && d < bd) { bd = d; best = e; } }
+  return best ? Math.atan2(best.y - P.y, best.x - P.x) : P.face;
+}
+function spend(k) {
+  const s = SPELLS[k]; if (S.mode !== 'play') return false;
+  if (P.lvl < s.lvl) { once('lock' + k, 'That spell opens at level ' + s.lvl + '. Drink elixirs to grow.', 2.8); return false; }
+  if (P.ink < s.cost) { floatText(P.x, P.y, 3.2 + P.h, 'no ink', 'miss'); return false; }
+  P.ink -= s.cost; hudStats(); return true;
+}
+function castFire() {
+  if (!spend('fire')) return; const a = aimAngle(); P.face = a;
+  const g = M.makeFireball(); R.root.add(g);
+  W.fireballs.push({ x: P.x + Math.cos(a) * 0.8, y: P.y + Math.sin(a) * 0.8, h: 1.3 + P.h, vx: Math.cos(a) * 12, vy: Math.sin(a) * 12, life: 1.1, g });
+  audio.play('fire'); glow(P.x, P.y, 4, 1.2, [1, 0.6, 0.25], 0.25); P.atkCd = Math.max(P.atkCd, 0.2);
+}
+function explode(f) {
+  removeObj(f.g); const r = 2.5;
+  W.burns.push({ x: f.x, y: f.y, r, t: 0, life: 3.6, tick: 0 }); if (W.burns.length > 4) W.burns.shift();
+  pulse(f.x, f.y, [1, 0.6, 0.2], 1.6, 9, 0.5, 0.3); glow(f.x, f.y, 8, 1.8, [1, 0.55, 0.2], 0.5); burst(f.x, f.y, 0.6, 18, 0xffb050, 7); burst(f.x, f.y, 0.6, 8, 0xffe9a8, 5);
+  S.shake = Math.max(S.shake, 0.4); audio.play('slam');
+  for (const e of W.enemies) if (!e.dead && dist(e.x, e.y, f.x, f.y) < r + e.r) hitEnemy(e, 2 * P.dmgMul, Math.atan2(e.y - f.y, e.x - f.x));
+}
+function castBolt() {
+  if (!spend('bolt')) return; const a = aimAngle(); P.face = a;
+  const pts = [[P.x, P.y]], hit = []; let cx = P.x, cy = P.y, reach = 10;
+  for (let n = 0; n < 4; n++) {
+    let best = null, bd = reach;
+    for (const e of W.enemies) {
+      if (e.dead || hit.includes(e) || (e.type === 'boss' && e.state === 'spawn')) continue;
+      const d = dist(cx, cy, e.x, e.y); if (d < bd && (n > 0 || d < 3 || Math.abs(angDiff(Math.atan2(e.y - cy, e.x - cx), a)) < 1.2)) { bd = d; best = e; }
+    }
+    if (!best) break; hit.push(best); pts.push([best.x, best.y]); cx = best.x; cy = best.y; reach = 5.5;
+  }
+  if (!hit.length) pts.push([P.x + Math.cos(a) * 6, P.y + Math.sin(a) * 6]);
+  W.bolts.push({ pts, t: 0 }); if (W.bolts.length > 2) W.bolts.shift();
+  hit.forEach((e, i) => hitEnemy(e, 2.5 * P.dmgMul * Math.pow(0.8, i), Math.atan2(e.y - P.y, e.x - P.x)));
+  for (let i = 1; i < pts.length; i++) { const g = M.makeSkyBolt(); place(g, pts[i][0], pts[i][1]); R.root.add(g); W.skybolts.push({ g, t: 0 }); glow(pts[i][0], pts[i][1], 6, 2.0, [0.7, 0.9, 1], 0.3); burst(pts[i][0], pts[i][1], 0.8, 8, 0xc8f0ff, 7); }
+  S.shake = Math.max(S.shake, 0.5); audio.play('zap'); P.atkCd = Math.max(P.atkCd, 0.25);
+}
+function spawnElixirs() {
+  const r = rng(4242), kinds = ['xp', 'xp', 'xp', 'ink', 'ink', 'hp']; W.elixirs = [];
+  for (let i = 0, tries = 0; i < 90 && tries < 4000; tries++) {
+    const x = 3 + r() * (SIZE[0] - 6), y = 3 + r() * (SIZE[1] - 6);
+    if (W.T.blocked(x, y, 0.6)) continue;
+    W.elixirs.push({ id: i++, x, y, kind: kinds[Math.floor(r() * kinds.length)], ph: r() * 6, g: null, gone: false });
+  }
+  // three right by the start, so the first minute teaches it
+  [[4.5, 1.6, 'xp'], [7, 0.6, 'ink'], [9.5, 1.4, 'xp']].forEach(([dx, dy, kind], k) => W.elixirs.push({ id: 100 + k, x: W.B.start.x + dx, y: W.B.start.y + dy, kind, ph: k, g: null, gone: false }));
+}
+function updateMagic(dt) {
+  const play = S.mode === 'play';
+  P.ink = Math.min(P.maxInk, P.ink + dt * 2.5); S.hudT = (S.hudT || 0) - dt; if (S.hudT <= 0) { S.hudT = 0.25; hudStats(); }
+  for (const f of W.fireballs) {
+    f.x += f.vx * dt; f.y += f.vy * dt; f.life -= dt; f.h += (1.0 - f.h) * Math.min(1, dt * 3); place(f.g, f.x, f.y, f.h); f.g.rotation.y += dt * 12; f.g.rotation.x += dt * 9;
+    if (Math.random() < dt * 30) burst(f.x, f.y, f.h, 1, 0xffb050, 1.5);
+    let hit = f.life <= 0 || W.T.isSolid(f.x, f.y);
+    for (const e of W.enemies) if (!e.dead && dist(e.x, e.y, f.x, f.y) < e.r + 0.5) hit = true;
+    if (hit) { f.dead = true; explode(f); }
+  }
+  W.fireballs = W.fireballs.filter(f => !f.dead);
+  for (const b of W.burns) {
+    b.t += dt; b.tick -= dt;
+    if (b.tick <= 0) { b.tick = 0.5; for (const e of W.enemies) if (!e.dead && dist(e.x, e.y, b.x, b.y) < b.r) hitEnemy(e, 0.5 * P.dmgMul, Math.atan2(e.y - b.y, e.x - b.x), true); }
+    if (Math.random() < dt * 10) burst(b.x + rnd(-b.r, b.r) * 0.7, b.y + rnd(-b.r, b.r) * 0.7, 0.2, 1, 0xffb050, 1.2);
+  }
+  W.burns = W.burns.filter(b => b.t < b.life);
+  for (const b of W.bolts) b.t += dt; W.bolts = W.bolts.filter(b => b.t < 0.3);
+  for (const s of W.skybolts) { s.t += dt; s.g.rotation.y = rnd(6.28); s.g.scale.x = s.g.scale.z = 0.6 + rnd(0.8); if (s.t > 0.22) { removeObj(s.g); s.dead = true; } }
+  W.skybolts = W.skybolts.filter(s => !s.dead);
+  for (const e of W.elixirs) {
+    if (e.gone) continue; const d = dist(P.x, P.y, e.x, e.y);
+    if (d > 36) { if (e.g) { removeObj(e.g); e.g = null; } continue; }
+    if (!e.g) { e.g = M.makeElixir(e.kind); R.root.add(e.g); }
+    place(e.g, e.x, e.y, 0.25 + Math.sin(S.t * 2.2 + e.ph) * 0.12); e.g.rotation.y += dt * 1.4;
+    if (d < 1.0 && play && !P.up) {
+      e.gone = true; removeObj(e.g); e.g = null; audio.play('heart'); pulse(e.x, e.y, ELX[e.kind].col, 1.2, 6, 0.5); glow(e.x, e.y, 4, 1.2, ELX[e.kind].col, 0.4);
+      if (e.kind === 'hp') { P.hp = Math.min(P.maxHp, P.hp + 2); hudHearts(); floatText(e.x, e.y, 2.4, '+2 HP', 'hurt'); gainXP(5); }
+      else if (e.kind === 'ink') { P.ink = Math.min(P.maxInk, P.ink + 40); floatText(e.x, e.y, 2.4, '+40 INK', 'ink'); gainXP(5); }
+      else { floatText(e.x, e.y, 2.4, '+25 XP', 'gain'); gainXP(25); }
+      once('elx', 'Elixirs. Gold makes you grow, blue fills your ink, red mends you.', 3.2); save();
+    }
+  }
+}
+
 function startAttack(mx, my, moving) {
   let a = P.face;
   if (S.t - input.mouseT < 2.5 && !document.body.classList.contains('touch')) {
@@ -263,14 +391,16 @@ function startAttack(mx, my, moving) {
     for (const e of W.enemies) { const d = dist(P.x, P.y, e.x, e.y) - e.r; if (!e.dead && e.state !== 'sleep' && d < bd) { bd = d; best = e; } }
     if (best) a = Math.atan2(best.y - P.y, best.x - P.x); else if (moving) a = Math.atan2(my, mx);
   }
-  P.face = a; P.combo = P.comboT > 0 ? (P.combo % 3) + 1 : 1;
+  const wp = WEAPONS[P.weapon];
+  P.face = a; P.combo = P.comboT > 0 ? (P.combo % 3) + 1 : 1; if (!wp.spin && P.combo === 3) P.combo = 1;
   const spin = P.combo === 3;
-  P.atkDur = P.atkT = spin ? 0.34 : 0.22; P.atkCd = spin ? 0.46 : 0.25; P.comboT = P.atkCd + 0.42; P.hitDone = false;
+  P.atkDur = P.atkT = spin ? 0.34 : wp.dur; P.atkCd = spin ? 0.46 : wp.cd; P.comboT = P.atkCd + 0.42; P.hitDone = false;
   P.kx += Math.cos(a) * (spin ? 2 : 3.4); P.ky += Math.sin(a) * (spin ? 2 : 3.4);
-  audio.play(spin ? 'spin' : 'slash', P.combo);
+  audio.play(spin ? 'spin' : wp.snd, P.combo);
 }
 function doHit() {
-  const spin = P.combo === 3, range = spin ? 2.15 : 1.8, half = spin ? 4 : 1.25, dmg = spin ? 2 : 1;
+  const wp = WEAPONS[P.weapon], spin = P.combo === 3, range = spin ? 2.15 : wp.range, half = spin ? 4 : wp.half, dmg = (spin ? 2 : wp.dmg) * P.dmgMul;
+  if (wp.slam) { const hx = P.x + Math.cos(P.face) * 1.5, hy = P.y + Math.sin(P.face) * 1.5; pulse(hx, hy, [1, 0.85, 0.5], 1.5, 8, 0.45, 0.3); glow(hx, hy, 5, 1.5, [1, 0.85, 0.5], 0.3); burst(hx, hy, 0.3, 10, 0xffd98a, 6); S.shake = Math.max(S.shake, 0.45); audio.play('slam'); }
   if (spin) pulse(P.x, P.y, [1, 0.95, 0.8], 0.9, 9, 0.28, 0.4);
   glow(P.x + Math.cos(P.face), P.y + Math.sin(P.face), 2.8, 0.7, [1, 0.8, 0.9], 0.14);
   W.scars.push({ x: P.x, y: P.y, a: P.face, t: 0, spin }); if (W.scars.length > 4) W.scars.shift();
@@ -300,6 +430,9 @@ function updatePlayer(dt) {
   [mx, my] = [mx * CY + my * SY, -mx * SY + my * CY];     // the camera is turned: up on screen is not north
   p.inv = Math.max(0, p.inv - dt); p.dashCd -= dt; p.atkCd -= dt; p.comboT -= dt;
   if (input.use) { input.use = false; interact(); }
+  if (input.swap) { input.swap = false; nextWeapon(); }
+  if (input.s1) { input.s1 = false; castFire(); }
+  if (input.s2) { input.s2 = false; castBolt(); }
   if (input.ride) { input.ride = false; ride(); }
   if (input.fire) { input.fire = false; campfire(); }
   if (p.up) { input.attack = input.held = input.dash = false; }
@@ -334,7 +467,7 @@ function updatePlayer(dt) {
   if (tag === 1 && p.dashT <= 0 && !p.up) { p.burnT += dt; if (p.burnT > 0.12) hurtPlayer(1, p.x - p.vx, p.y - p.vy + 0.01, 6); } else p.burnT = 0;
   if (p.atkT > 0) {
     const el = p.atkDur - p.atkT;
-    if (!p.hitDone && el >= 0.06) { p.hitDone = true; doHit(); }
+    if (!p.hitDone && el >= p.atkDur * (p.combo === 3 ? 0.2 : WEAPONS[p.weapon].hitAt)) { p.hitDone = true; doHit(); }
     p.atkT -= dt;
   }
   // which land are we standing in
@@ -368,7 +501,7 @@ function poseHero(dt) {
   if (atk) {
     const k = clamp(el / p.atkDur, 0, 1), dir = p.combo === 2 ? -1 : 1;
     m.armR.rotation.set(-0.1, spin ? k * Math.PI * 2 : dir * lerp(1.7, -1.7, k), 0);
-    m.arc.visible = !spin && el > 0.03 && el < 0.17; m.arc.scale.setScalar(1.5 + k * 0.5); m.arc.scale.y *= dir;
+    m.arc.visible = !spin && el > 0.03 && el < 0.17; m.arc.scale.setScalar((1.5 + k * 0.5) * WEAPONS[p.weapon].range / 1.8); m.arc.scale.y *= dir;
     m.spin.visible = spin && el > 0.04 && el < 0.26; m.spin.scale.setScalar(0.9 + k * 1.3);
   } else { m.armR.rotation.set(-1.2 - sw * 0.1, 0.12, 0); m.arc.visible = m.spin.visible = false; }
   m.armL.rotation.x = -0.2 + sw * 0.2; m.lantern.rotation.x = clamp(-lvz * 0.06, -0.5, 0.5) - sw * 0.1;
@@ -378,7 +511,7 @@ function poseHero(dt) {
   const pts = W.trailPts;
   for (const q of pts) q.t += dt;
   while (pts.length && pts[0].t > 0.16) pts.shift();
-  if ((atk || p.dashT > 0) && m.g.visible) { pts.push({ a: m.tipMark.getWorldPosition(new THREE.Vector3()), b: m.baseMark.getWorldPosition(new THREE.Vector3()), t: 0 }); if (pts.length > TRAIL + 1) pts.shift(); }
+  if ((atk || p.dashT > 0) && m.g.visible) { pts.push({ a: m.weapons[p.weapon].tip.getWorldPosition(new THREE.Vector3()), b: m.weapons[p.weapon].base.getWorldPosition(new THREE.Vector3()), t: 0 }); if (pts.length > TRAIL + 1) pts.shift(); }
   const arr = W.trail.geometry.attributes.position.array; arr.fill(0);
   for (let i = 0; i + 1 < pts.length; i++) {
     const a = pts[i], b = pts[i + 1], o = i * 18;
@@ -405,22 +538,23 @@ function spawnEnemy(type, x, y, owner = null, sleep = false) {
   place(o.g, x, y); o.g.scale.setScalar(sleep ? 1 : 0.01); R.root.add(o.g); W.enemies.push(e);
   return e;
 }
-function hitEnemy(e, dmg, a) {
+function hitEnemy(e, dmg, a, soft = false) {
   if (e.dead || (e.type === 'boss' && e.state === 'spawn')) return;
   e.hp -= dmg; e.flash = 0.1;
   const kb = e.type === 'boss' ? 0 : e.type === 'brute' ? (e.state === 'charge' ? 0 : 2.2) : 7;
-  e.kx = Math.cos(a) * kb; e.ky = Math.sin(a) * kb;
+  e.kx = Math.cos(a) * kb * (soft ? 0.12 : 1); e.ky = Math.sin(a) * kb * (soft ? 0.12 : 1);
   if (e.state === 'sleep') e.state = 'chase';
   if (e.type !== 'boss' && e.type !== 'brute' && (e.state === 'wind' || e.state === 'leap')) { e.state = 'chase'; e.cd = 0.5; }
   burst(e.x, e.y, 0.9, 4, 0xffffff, 4); audio.play('hit');
-  floatText(e.x, e.y, e.type === 'boss' ? 3.6 : 1.9, String(dmg * 10 + Math.floor(rnd(-3, 4))), dmg > 1 ? 'dmg crit' : 'dmg'); glow(e.x, e.y, 2.4, 1.1, [1, 0.95, 0.85], 0.16);
-  S.hitstop = Math.max(S.hitstop, dmg > 1 ? 0.07 : 0.04); S.shake = Math.max(S.shake, 0.16);
+  floatText(e.x, e.y, e.type === 'boss' ? 3.6 : 1.9, String(Math.max(1, Math.round(dmg * 10 + rnd(-3, 4)))), soft ? 'burn' : dmg >= 2 ? 'dmg crit' : 'dmg'); glow(e.x, e.y, 2.4, 1.1, [1, 0.95, 0.85], 0.16);
+  if (!soft) { S.hitstop = Math.max(S.hitstop, dmg > 1 ? 0.07 : 0.04); S.shake = Math.max(S.shake, 0.16); }
   if (e.type === 'boss') $('bossbar').firstChild.style.width = clamp(e.hp / e.maxHp * 100, 0, 100) + '%';
   if (e.hp <= 0) killEnemy(e);
 }
 function killEnemy(e) {
   e.dead = true;
   if (e.type === 'boss') return bossDead(e);
+  gainXP({ blot: 6, scratch: 8, brute: 20 }[e.type] || 5);
   removeObj(e.o.g); audio.play('kill'); glow(e.x, e.y, 4, 1.2, [0.75, 0.55, 1], 0.45);
   burst(e.x, e.y, 0.8, e.type === 'brute' ? 22 : 12, 0xc9a8ff, 6); pulse(e.x, e.y, [0.8, 0.7, 1], 1, 7, 0.5);
   if (Math.random() < (P.hp <= 2 ? 0.45 : 0.16)) addHeart(e.x, e.y);
@@ -598,6 +732,7 @@ function updateBossHazards(dt) {
   W.lines = W.lines.filter(l => l.t < l.tele + 0.24);
 }
 function bossDead(e) {
+  gainXP(120);
   W.bossState = 'dying'; W.lines = []; W.slams = []; audio.play('bossdie'); audio.intense = false; S.hitstop = 0.25;
   for (const m of W.enemies) if (m !== e && !m.dead && (m.minion || dist(m.x, m.y, e.x, e.y) < 12)) { m.dead = true; removeObj(m.o.g); burst(m.x, m.y, 0.8, 10, 0xc9a8ff, 6); }
   for (const s of W.shots) removeObj(s.g); W.shots = [];
@@ -641,7 +776,7 @@ function updateWorld(dt) {
     if (free && d < 1.05 && play) {
       const land = W.lands[l.land];
       l.state = 'taken'; removeObj(o.g); audio.play('letter', land.letters.filter(x => x.state === 'taken').length);
-      pulse(l.x, l.y, [1, 0.95, 0.75], 1.6, 8, 0.8); burst(l.x, l.y, 1.2, 14, 0xfff1c9, 6); glow(l.x, l.y, 6, 1.4, [1, 0.9, 0.6], 0.9); floatText(l.x, l.y, 2.4, '+' + l.ch, 'gain');
+      pulse(l.x, l.y, [1, 0.95, 0.75], 1.6, 8, 0.8); burst(l.x, l.y, 1.2, 14, 0xfff1c9, 6); glow(l.x, l.y, 6, 1.4, [1, 0.9, 0.6], 0.9); floatText(l.x, l.y, 2.4, '+' + l.ch, 'gain'); gainXP(15);
       P.cx = l.x; P.cy = l.y; if (P.hp < P.maxHp) { P.hp++; hudHearts(); }
       if (land.letters.every(x => x.state === 'taken')) wordComplete(land); else hudWord();
       save();
@@ -677,7 +812,7 @@ function updateWorld(dt) {
     bc.core.rotation.y += dt * (land.lit ? 2 : 0.4 + bc.channel * 5);
   }
   for (const f of W.flames) { const k = 0.85 + Math.sin(S.t * 9 + f.ph) * 0.12 + Math.sin(S.t * 23 + f.ph * 2) * 0.06; f.m.scale.set(f.s.x * (2 - k), f.s.y * k, f.s.z * (2 - k)); }
-  updateHorse(dt);
+  updateHorse(dt); updateMagic(dt);
   if (W.fire) {
     const f = W.fire; f.t += dt; f.heal += dt;
     if (Math.random() < dt * 7) burst(f.x + rnd(-0.2, 0.2), f.y + rnd(-0.2, 0.2), 0.7, 1, Math.random() < 0.5 ? 0xffb050 : 0xffe9a8, 0.9);
@@ -760,6 +895,8 @@ function fillUniforms() {
   }
   if (W.boss) Ls.push([W.boss.x, W.boss.y, 4.5, 0.8, 1, 0.2, 0.35, 0]);
   if (W.fire) Ls.push([W.fire.x, W.fire.y, 7.5 * (1 + Math.sin(S.t * 9) * 0.04), 1.5 + Math.sin(S.t * 13) * 0.12, 1, 0.62, 0.25, 0.2]);
+  for (const b of W.burns) Ls.push([b.x, b.y, b.r * 2.6, 1.4 * clamp((b.life - b.t) / 1.2, 0, 1), 1, 0.5, 0.15, 0.3]);
+  for (const e of W.elixirs) if (e.g) Ls.push([e.x, e.y, 1.7, 0.9, ...ELX[e.kind].col, dist(e.x, e.y, S.camX, S.camY) + 3]);
   for (const g of W.glows) Ls.push([g.x, g.y, g.r, g.int * g.life / g.max, ...g.col, 0.5]);
   Ls.sort((a, b) => a[7] - b[7]);
   for (let i = 0; i < MAX_LIGHTS; i++) {
@@ -781,6 +918,10 @@ function fillUniforms() {
   const ps = W.pulses.slice(-MAX_PULSE);
   for (let i = 0; i < MAX_PULSE; i++) { const p = ps[i]; if (p) { u.uPulse.value[i].set(p.x, p.y, p.r, p.w * clamp(p.life / p.max, 0, 1)); u.uPulseCol.value[i].set(...p.col); } else u.uPulse.value[i].set(0, 0, 0, 0); }
   for (let i = 0; i < 4; i++) { const l = W.lines[i]; if (l && l.t >= 0) u.uLine.value[i].set(l.pos, l.dir, l.hw, l.t < l.tele ? 0.3 + 0.3 * (Math.floor(l.t * 12) % 2) + l.t / l.tele * 0.3 : 2.2); else u.uLine.value[i].set(0, 0, 0, 0); }
+  for (let i = 0; i < 4; i++) { const b = W.burns[i]; if (b) u.uBurn.value[i].set(b.x, b.y, b.r * Math.min(1, b.t * 6), clamp((b.life - b.t) / 1.2, 0, 1)); else u.uBurn.value[i].set(0, 0, 0, 0); }
+  let bi = 0, ba = 0;
+  for (const b of W.bolts) { ba = Math.max(ba, 1 - b.t / 0.3); for (let i = 0; i + 1 < b.pts.length && bi < 6; i++) u.uBolt.value[bi++].set(b.pts[i][0], b.pts[i][1], b.pts[i + 1][0], b.pts[i + 1][1]); }
+  while (bi < 6) u.uBolt.value[bi++].set(0, 0, 0, 0); u.uBoltA.value = ba;
   const rings = [];
   for (const e of W.enemies) {
     if (e.dead || rings.length >= 6) continue;
@@ -928,6 +1069,9 @@ function bind() {
     if (e.code === 'KeyJ' || e.code === 'Space') { input.attack = true; input.held = true; }
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyK') input.dash = true;
     if (e.code === 'KeyE') input.use = true;
+    if (e.code === 'KeyQ') input.swap = true;
+    if (e.code === 'Digit1') input.s1 = true;
+    if (e.code === 'Digit2') input.s2 = true;
     if (e.code === 'KeyR') input.ride = true;
     if (e.code === 'KeyF') input.fire = true;
     if (e.code === 'KeyM') toggleSound();
@@ -962,7 +1106,7 @@ function bind() {
   const btn = (id, down, upf) => { const b = $(id); b.addEventListener('pointerdown', (e) => { e.preventDefault(); audio.start(); b.classList.add('down'); down(); }); const u = () => { b.classList.remove('down'); upf && upf(); }; b.addEventListener('pointerup', u); b.addEventListener('pointercancel', u); b.addEventListener('pointerleave', u); };
   btn('bA', () => { input.attack = true; input.held = true; }, () => { input.held = false; });
   btn('bD', () => { input.dash = true; });
-  btn('bU', () => { input.use = true; }); btn('bR', () => { input.ride = true; }); btn('bF', () => { input.fire = true; });
+  btn('bU', () => { input.use = true; }); btn('bR', () => { input.ride = true; }); btn('bF', () => { input.fire = true; }); btn('bW', () => { input.swap = true; }); btn('b1', () => { input.s1 = true; }); btn('b2', () => { input.s2 = true; });
   $('start').addEventListener('click', () => startGame(false));
   $('cont').addEventListener('click', () => startGame(true));
   $('snd').addEventListener('click', toggleSound);
@@ -987,7 +1131,7 @@ function startGame(cont) {
   const sv = cont && readSave();
   if (sv) { applySave(sv); S.land = -1; enterLand(W.T.regAt(P.x, P.y)); }
   else { clearSave(); S.land = -1; enterLand(0); after(8.5, () => say('No walls out here. Go anywhere. R calls your horse, Z shows the whole world.', 4)); }
-  $('hint').textContent = 'WASD MOVE \u00b7 CLICK STRIKE \u00b7 SHIFT DASH \u00b7 R HORSE \u00b7 E USE \u00b7 F FIRE \u00b7 WHEEL ZOOM';
+  $('hint').textContent = 'CLICK STRIKE \u00b7 Q WEAPON \u00b7 1 FIRE \u00b7 2 BOLT \u00b7 SHIFT DASH \u00b7 R HORSE \u00b7 E USE \u00b7 F CAMP';
   setTimeout(() => { $('hint').textContent = ''; }, 30000);
 }
 
@@ -1003,7 +1147,7 @@ async function boot() {
     audio.pending = LANDS[0].music;
     requestAnimationFrame(frame);
     const q = new URLSearchParams(location.search);
-    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire };
+    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire, castFire, castBolt, gainXP, nextWeapon };
   } catch (err) {
     console.error(err); $('err').style.display = 'flex'; $('title').classList.remove('on');
   }

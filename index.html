@@ -24,7 +24,16 @@ body { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; fon
 #panel b { font-weight: 800; color: var(--dim); font-size: 11px; letter-spacing: .14em; margin-right: 6px; }
 #chapter { font-size: 12px; font-weight: 800; letter-spacing: .1em; color: #fff; }
 #hearts { margin-top: 6px; font-size: 15px; letter-spacing: .02em; color: #fff; white-space: nowrap; }
-#hearts i { font-style: normal; color: #4a4668; }
+#hearts i, #ink i, #lv i { font-style: normal; color: #4a4668; }
+#ink, #lv { margin-top: 3px; font-size: 12px; white-space: nowrap; }
+#ink { color: #7fc0ff; } #lv { color: var(--gold); }
+#ink small, #lv small { font-size: 10px; color: var(--dim); margin-left: 4px; }
+#slots { margin-top: 7px; display: flex; gap: 5px; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+#slots span { border: 1px solid #c8c4e0; padding: 2px 5px; color: #fff; }
+#slots span.off { color: #55516f; border-color: #3a3860; }
+.ft.lvl { font-size: 30px; color: var(--gold); letter-spacing: .2em; }
+.ft.ink { color: #7fc0ff; font-size: 18px; }
+.ft.burn { color: #ffb050; font-size: 13px; }
 #hearts small { font-size: 11px; color: var(--dim); margin-left: 4px; }
 #word { margin-top: 5px; font-size: 16px; font-weight: 800; letter-spacing: .3em; color: var(--gold); white-space: nowrap; }
 #word i { font-style: normal; color: #4a4668; }
@@ -81,7 +90,7 @@ h1 s { color: var(--red); text-decoration-thickness: .06em; text-decoration-colo
 #touch { display: none; pointer-events: auto; }
 body.touch #touch { display: block; }
 body.touch #hint { display: none; }
-body.touch #msg { bottom: 27%; }
+body.touch #msg { bottom: 47%; }
 #stick { position: absolute; left: 0; top: 0; width: 55%; height: 100%; }
 #base { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border: 1px solid rgba(233,230,245,.35); border-radius: 50%; display: none; }
 #knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(233,230,245,.3); }
@@ -96,6 +105,9 @@ body.touch #msg { bottom: 27%; }
 .lab.npc i, .lab.prompt i { display: none; }
 .lab.npc { color: var(--gold); }
 .lab.prompt { color: #05060c; background: var(--gold); padding: 2px 7px; text-shadow: none; letter-spacing: .08em; }
+#bW { right: max(20px, env(safe-area-inset-right)); bottom: calc(max(44px, env(safe-area-inset-bottom)) + 170px); }
+#b1 { right: calc(max(20px, env(safe-area-inset-right)) + 68px); bottom: calc(max(44px, env(safe-area-inset-bottom)) + 170px); border-color: #ffb050; color: #ffb050; }
+#b2 { right: calc(max(20px, env(safe-area-inset-right)) + 136px); bottom: calc(max(44px, env(safe-area-inset-bottom)) + 162px); border-color: #a8e0ff; color: #a8e0ff; }
 #err { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 30px; text-align: center; color: var(--pink); line-height: 1.7; }
 </style>
 </head>
@@ -105,8 +117,11 @@ body.touch #msg { bottom: 27%; }
 <div id="hud" class="layer">
   <div id="panel"><div id="chapter"></div>
   <div id="hearts" aria-label="health"></div>
+  <div id="ink" aria-label="ink for spells"></div>
+  <div id="lv" aria-label="level and experience"></div>
   <div id="word" aria-label="word to write"></div>
-  <div id="lanterns" aria-label="lanterns lit"></div></div>
+  <div id="lanterns" aria-label="lanterns lit"></div>
+  <div id="slots" aria-label="weapon and spells"></div></div>
   <div id="tools"><button id="zout" type="button" aria-label="zoom out">&minus;</button><button id="zmap" type="button" aria-label="toggle map view">MAP</button><button id="zin" type="button" aria-label="zoom in">+</button><button id="snd" type="button" aria-label="toggle sound">SOUND ON</button><button id="pz" type="button" aria-label="pause">II</button></div>
   <div id="boss"><b>THE EDITOR</b><div id="bossbar"><div></div></div></div>
   <div id="arrow">&gt;<small></small></div>
@@ -123,7 +138,10 @@ body.touch #msg { bottom: 27%; }
   <div id="bD" class="tb">DASH</div>
   <div id="bU" class="tb sm">USE</div>
   <div id="bR" class="tb sm">HORSE</div>
-  <div id="bF" class="tb sm">FIRE</div>
+  <div id="bF" class="tb sm">CAMP</div>
+  <div id="bW" class="tb sm">WPN</div>
+  <div id="b1" class="tb sm">FLAME</div>
+  <div id="b2" class="tb sm">BOLT</div>
   <div id="bA" class="tb">STRIKE</div>
 </div>
 
@@ -135,7 +153,7 @@ body.touch #msg { bottom: 27%; }
   <div class="lead">Something is deleting the world, one word at a time. You are the last Scribe. It is an open world: no walls, five lands, any order. Ride, climb the towers, light fires, find the letters and write the world back.</div>
   <div id="loading" class="tag" style="margin-top:30px;color:var(--gold)">WRITING THE WORLD...</div>
   <div class="row" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center"><button id="cont" class="go" type="button" style="display:none">CONTINUE</button><button id="start" class="go" type="button" style="visibility:hidden">NEW GAME</button></div>
-  <div class="keys" id="keys">WASD / ARROWS move &nbsp;·&nbsp; CLICK / J strike &nbsp;·&nbsp; SHIFT / K / RIGHT CLICK dash<br>R call or leave your horse &nbsp;·&nbsp; E climb a tower, talk &nbsp;·&nbsp; F light a campfire<br>MOUSE WHEEL or + &minus; zoom &nbsp;·&nbsp; Z map &nbsp;·&nbsp; M sound &nbsp;·&nbsp; ESC pause</div>
+  <div class="keys" id="keys">WASD / ARROWS move &nbsp;·&nbsp; CLICK / J strike &nbsp;·&nbsp; SHIFT / K / RIGHT CLICK dash<br>R call or leave your horse &nbsp;·&nbsp; E climb a tower, talk &nbsp;·&nbsp; F light a campfire<br>Q switch weapon &nbsp;·&nbsp; 1 fire &nbsp;·&nbsp; 2 lightning &nbsp;·&nbsp; drink elixirs to level up<br>MOUSE WHEEL or + &minus; zoom &nbsp;·&nbsp; Z map &nbsp;·&nbsp; M sound &nbsp;·&nbsp; ESC pause</div>
 </div>
 
 <div id="pause" class="screen"><div class="t" style="font-size:32px;font-weight:800;letter-spacing:.3em">PAUSED</div><div class="row" style="margin-top:22px;display:flex;gap:10px"><button id="resume" type="button">RESUME</button><button id="quit" type="button">TITLE</button></div></div>

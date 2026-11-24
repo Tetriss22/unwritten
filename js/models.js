@@ -82,6 +82,16 @@ export function makeHero() {
   part(quill, G.box, Gl(0xf0e8ff, 'quill'), 0.03, 0.32, 0.55, 0, -0.11, -0.1).rotation.x = -0.25;
   const tipMark = new THREE.Object3D(); tipMark.position.set(0, 0, 1.85); quill.add(tipMark);
   const baseMark = new THREE.Object3D(); baseMark.position.set(0, 0, 1.25); quill.add(baseMark);
+  // the SEAL: a heavy stamp on a long handle. Slow, wide, and it shakes the page.
+  const mark = (g, z) => { const o = new THREE.Object3D(); o.position.set(0, 0, z); g.add(o); return o; };
+  const seal = new THREE.Group(); seal.position.copy(quill.position); armR.add(seal);
+  part(seal, G.cyl, H(0xe0d0b0, 'wood'), 0.08, 1.8, 0.08, 0, 0, 0.6).rotation.x = Math.PI / 2;
+  part(seal, G.box, gold, 0.56, 0.56, 0.7, 0, 0, 1.55); part(seal, G.box, H(0xffffff, 'brick'), 0.66, 0.66, 0.16, 0, 0, 1.95);
+  // the NIBS: two short blades. Fast, close, light.
+  const nibs = new THREE.Group(); nibs.position.copy(quill.position); armR.add(nibs);
+  part(nibs, G.cone4, Gl(0xffffff, 'quill'), 0.16, 1.0, 0.06, 0, 0, 0.6).rotation.x = Math.PI / 2;
+  const nb2 = part(nibs, G.cone4, Gl(0xa8e0ff, 'quill'), 0.16, 0.9, 0.06, -0.3, 0, 0.5); nb2.rotation.x = Math.PI / 2; nb2.rotation.z = 0.5;
+  const weapons = [{ g: quill, tip: tipMark, base: baseMark }, { g: seal, tip: mark(seal, 2.1), base: mark(seal, 1.3) }, { g: nibs, tip: mark(nibs, 1.1), base: mark(nibs, 0.45) }];
   const armL = new THREE.Group(); armL.position.set(-0.38, 1.92, 0.02); body.add(armL);
   part(armL, G.cyl, coat, 0.17, 0.62, 0.17, -0.05, -0.26, 0.12).rotation.x = -0.5;
   part(armL, G.sph, skin, 0.15, 0.15, 0.15, -0.07, -0.52, 0.28);
@@ -95,7 +105,7 @@ export function makeHero() {
   const spin = new THREE.Mesh(G.ring, Gl(0xfff1c9, 'slash', { side: THREE.DoubleSide }));
   spin.rotation.x = -Math.PI / 2; spin.position.y = 1.05; spin.visible = false; g.add(spin);
   g.traverse(m => { if (m.isMesh) m.layers.set(m === arc || m === spin ? 2 : 3); });   // layer 3: drawn after the world, with a see-through pass
-  return { g, body, head, tip, armR, armL, quill, lantern, scarf, arc, spin, legs, robe, tipMark, baseMark };
+  return { g, body, head, tip, armR, armL, quill, lantern, scarf, arc, spin, legs, robe, tipMark, baseMark, weapons };
 }
 
 // ---------- the paper horse: same fine white letters as the Scribe, so the pair read as one
@@ -378,6 +388,23 @@ export function makeProp(p) {
     case 'sign': { const w = L(0xf0e0c0, 'wood'); add(G.cyl, w, 0.12, 1.6, 0.12, 0, 0.8, 0); add(G.box, w, 1.1, 0.34, 0.08, 0.2, 1.45, 0).rotation.y = 0.3; add(G.box, w, 0.9, 0.3, 0.08, -0.15, 1.05, 0).rotation.y = -0.5; g.rotation.y = p.rot; break; }
   }
   return g;
+}
+// ---------- magic and elixirs, written in the same letters as everything else
+const noShadow = (g) => { g.traverse(m => { if (m.isMesh) m.layers.set(2); }); return g; };
+export function makeFireball() { const g = new THREE.Group(); part(g, G.sph, Gl(0xff7a2a, 'fire'), 0.75, 0.75, 0.75); part(g, G.oct, Gl(0xffe9a8, 'fire'), 0.42, 0.42, 0.42); return noShadow(g); }
+export function makeSkyBolt() {
+  const g = new THREE.Group(); let x = 0, z = 0;
+  for (let i = 0; i < 7; i++) {
+    const nx = (Math.random() - 0.5) * 1.4, nz = (Math.random() - 0.5) * 1.4;
+    const seg = part(g, G.box, Gl(i % 2 ? 0xffffff : 0xa8e0ff, 'bolt'), 0.11, 1.55, 0.11, (x + nx) / 2, 0.7 + i * 1.35, (z + nz) / 2);
+    seg.rotation.z = Math.atan2(x - nx, 1.35); seg.rotation.x = Math.atan2(nz - z, 1.35); x = nx; z = nz;
+  }
+  return noShadow(g);
+}
+export function makeElixir(kind) {
+  const c = { xp: 0xffd060, ink: 0x5aa8ff, hp: 0xff5a78 }[kind], g = new THREE.Group();
+  part(g, G.sph, Gl(c, 'glass'), 0.52, 0.52, 0.52, 0, 0.3, 0); part(g, G.cyl, gmat(0xffffff, 'glass', { lift: 0.6 }), 0.2, 0.3, 0.2, 0, 0.66, 0); part(g, G.cyl, L(0xc8a878, 'wood'), 0.25, 0.1, 0.25, 0, 0.84, 0);
+  return noShadow(g);
 }
 export function makeChunk(hex) { return new THREE.Mesh(G.tet, gmat(hex, 'chunk', { glow: true })); }
 

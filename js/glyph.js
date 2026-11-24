@@ -32,6 +32,7 @@ export const KINDS = {   // symbols run from light to heavy: the lit side of a t
   wall: ['.:=I[]HN#', 6.5, 0], roof: ['.-=^/\\A', 6.5, 0], window: ['#H8@', 7, 0], door: [':|[]I', 7, 0],
   wood: ['.:|!lI=', 8, 0], stone: ['.:o0O%Q#', 7, 0], brick: ['.:=[]#', 6.5, 0], metal: ['.:!i|', 9, 0], lamp: ['*@#', 9, 0],
   leaf: ['.:o%&8@', 7.5, 1], needle: ['.^/\\AM', 7, 0.7], trunk: ['.:!|lI1', 8, 0], reed: ['|!/l', 9, 1.6], hay: ['.~=%/', 7, 0.5],
+  bolt: ['/\\|#N', 5, 0], glass: ['oO0@', 9, 0],
   snow: [".':*+", 7, 0], ice: ['.:/\\|V<>', 7, 0], fire: ['^*~W', 7, 0], book: ['=|#I', 8, 0], voidstone: ['.:-_?!', 6.5, 0], chunk: ['*+x#', 4, 0],
 };
 
