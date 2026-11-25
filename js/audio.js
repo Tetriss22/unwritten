@@ -48,6 +48,8 @@ export class Audio {
       case 'type': this.noise(0.022, 3600, 2200, 0.09, 3); break;
       case 'letter': [0, 4, 7, 12].forEach((n, i) => this.tone('triangle', mtof(72 + n + a), mtof(72 + n + a), 0.3, 0.2, i * 0.07)); break;
       case 'free': this.tone('sine', mtof(79), mtof(79), 0.5, 0.2); this.tone('sine', mtof(86), mtof(86), 0.6, 0.14, 0.09); break;
+      case 'rare': [0, 7, 12].forEach((n, i) => this.tone('triangle', mtof(81 + n), mtof(81 + n), 0.5, 0.14, i * 0.06)); break;
+      case 'legend': [0, 4, 7, 11, 14, 19, 24].forEach((n, i) => { this.tone('sine', mtof(64 + n), mtof(64 + n), 1.6, 0.17, i * 0.08); this.tone('triangle', mtof(52 + n), mtof(52 + n), 0.9, 0.06, i * 0.08); }); this.noise(1.2, 5000, 1200, 0.12, 2); break;
       case 'heart': this.tone('sine', mtof(76), mtof(83), 0.25, 0.22); break;
       case 'word': [0, 3, 7, 10, 12, 15, 19].forEach((n, i) => this.tone('triangle', mtof(60 + n), mtof(60 + n), 0.9, 0.16, i * 0.09)); break;
       case 'beacon': [0, 7, 12, 16, 19, 24].forEach((n, i) => { this.tone('sine', mtof(57 + n), mtof(57 + n), 2.4, 0.16, i * 0.14); this.tone('sine', mtof(57 + n) * 2.01, mtof(57 + n) * 2.01, 1.2, 0.05, i * 0.14); }); break;

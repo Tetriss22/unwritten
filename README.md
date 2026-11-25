@@ -32,6 +32,16 @@ Something is deleting the world one word at a time. You are the last Scribe. The
 - **Elixirs** are scattered over the whole world, about ninety of them: gold gives experience, blue refills ink, red heals. Kills and letters give experience too.
 - Each level adds 20% damage and 10 ink, and every second level adds a point of health. Levels, weapon and collected elixirs are saved.
 
+## Loot
+
+Unwriters drop gear, in four rarities: grey **common**, blue **magic**, gold **rare** and orange **legendary**. A drop stands under a pillar of letters in its colour, taller the rarer it is. Walk over it to pick it up; **I** (or the BAG button) opens your bag, where you wear it or salvage it for experience.
+
+- Three slots: **robe**, **ring**, **charm**. A worn robe tints the Scribe's coat in its colour.
+- Stats: damage, hearts, max ink, ink per second, crit chance (crits deal double), move speed, fire damage, lightning damage, ink on hit, experience.
+- Items from later lands and stronger enemies roll higher; brutes drop often, the Editor always drops a legendary.
+- Six legendaries, each with its own effect: **The Last Draft** (dashing cuts), **Cinder Mantle** (dash leaves fire), **Red Pen** (every 4th strike calls lightning), **Run-On Sentence** (kills burst into the enemies next to them), **Comma Splice** (fireballs split in three), **Margin of Error** (one hit in four misses you).
+- The bag shows whether an item is better or worse than what you wear, stat by stat. Gear and bag are saved.
+
 Striking a red shot sends it back. Striking from the saddle jumps you off swinging. Progress is saved in the browser, so a reload offers CONTINUE.
 
 ## The world

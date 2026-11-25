@@ -439,3 +439,15 @@ export function mergeStatic(groups) {
   }
   return out;
 }
+
+// ---------- loot on the ground: the thing itself, and a pillar of letters in its rarity's colour so it can be seen from far off
+export function makeLoot(slot, hex) {
+  const g = new THREE.Group(), it = new THREE.Group(); g.add(it);
+  const m = Gl(hex, 'gold'), w = Gl(0xffffff, 'glass');
+  if (slot === 'robe') { part(it, G.frust, m, 0.5, 0.5, 0.42, 0, 0.32, 0).rotation.x = Math.PI; part(it, G.cyl, w, 0.56, 0.08, 0.5, 0, 0.08, 0); }
+  else if (slot === 'ring') { const r = part(it, G.tor, m, 0.62, 0.62, 2.4, 0, 0.42, 0); r.rotation.x = 0.3; part(it, G.oct, w, 0.2, 0.24, 0.2, 0, 0.78, 0); }
+  else { part(it, G.oct, m, 0.42, 0.6, 0.42, 0, 0.45, 0); part(it, G.torThin, w, 0.7, 0.7, 4, 0, 0.45, 0).rotation.x = Math.PI / 2; }
+  const beam = part(g, G.cyl, Gl(hex, 'bolt'), 0.12, 1, 0.12, 0, 0.5, 0);
+  const halo = part(g, G.ring, Gl(hex, 'gold', { side: THREE.DoubleSide }), 0.75, 0.75, 0.75, 0, 0.04, 0); halo.rotation.x = -Math.PI / 2;
+  return { g: noShadow(g), it, beam, halo };
+}
