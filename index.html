@@ -51,6 +51,7 @@ body { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; fon
 #lanterns { margin-top: 5px; font-size: 13px; letter-spacing: .2em; color: var(--gold); }
 #lanterns i { font-style: normal; color: #4a4668; }
 #lanterns small { font-size: 10px; letter-spacing: .2em; color: var(--dim); }
+#secrets { margin-top: 3px; font-size: 11px; color: var(--gold); } #secrets i { font-style: normal; color: var(--dim); }
 #map { opacity: 0; transition: opacity .25s; }
 .ml { position: absolute; left: 0; top: 0; font-size: clamp(10px, 1.3vw, 14px); letter-spacing: .16em; color: #fff; text-align: center; white-space: nowrap; text-shadow: 0 0 6px #000, 0 0 12px #000, 0 0 2px #000; will-change: transform; }
 .ml b { color: var(--pink); }
@@ -168,6 +169,7 @@ body.cap #card, body.cap #msg, body.cap #hint, body.cap #tools, body.cap #arrow,
   <div id="lv" aria-label="level and experience"></div>
   <div id="word" aria-label="word to write"></div>
   <div id="lanterns" aria-label="lanterns lit"></div>
+  <div id="secrets" aria-label="hidden caches found"></div>
   <div id="slots" aria-label="weapon and spells"></div></div>
   <div id="tools"><button id="zout" type="button" aria-label="zoom out">&minus;</button><button id="zmap" type="button" aria-label="toggle map view">MAP</button><button id="zin" type="button" aria-label="zoom in">+</button><button id="bagBtn" type="button" aria-label="open bag">BAG</button><button id="snd" type="button" aria-label="toggle sound">SOUND ON</button><button id="pz" type="button" aria-label="pause">II</button></div>
   <div id="boss"><b>THE EDITOR</b><div id="bossbar"><div></div></div></div>

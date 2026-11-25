@@ -182,8 +182,8 @@ export const LANDS = [
 ];
 
 // ---------- the map: named places [x, y, radius, land]
-const K = 1.4;                       // the map below is drawn on a 128 x 92 sheet and stretched: more open land between places
-export const SIZE = [179, 129];
+const K = 1.852;                      // the map below is drawn on a 128 x 92 sheet and stretched: more open land between places
+export const SIZE = [237, 170];
 const PLACES = {
   // I  the Margin (south-west) and the south road
   M0: [10, 84, 3, 0], M1: [18, 82, 2.5, 0], M2: [26, 76, 3, 0], M3: [16, 72, 2.8, 0], M4: [30, 86, 2.6, 0], M5: [36, 70, 3, 0], M6: [24, 64, 2.8, 0],

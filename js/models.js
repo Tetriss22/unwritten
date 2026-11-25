@@ -174,6 +174,29 @@ export function makeEnemy(type) {
     part(body, G.box, eye, 1.0, 0.16, 0.1, 0, 1.3, 0.48);
     o.armL = part(body, G.box, ink2, 0.4, 1.1, 0.5, -0.98, 0.8, 0.1);
     o.armR = part(body, G.box, ink2, 0.4, 1.1, 0.5, 0.98, 0.8, 0.1);
+  } else if (type === 'typo') {            // a small quick mistake; they come in fours
+    part(body, G.oct, ink, 0.5, 0.42, 0.5, 0, 0.32, 0); part(body, G.cone4, ink2, 0.16, 0.34, 0.16, 0, 0.66, 0);
+    part(body, G.sph, eye, 0.2, 0.2, 0.1, 0, 0.36, 0.22);
+  } else if (type === 'asterisk') {        // a footnote with a fuse
+    o.star = new THREE.Group(); o.star.position.y = 0.85; body.add(o.star);
+    part(o.star, G.sph, Gl(0xffa040, 'fire'), 0.5, 0.5, 0.5);
+    for (let i = 0; i < 6; i++) { const sp = part(o.star, G.cone4, ink, 0.24, 0.66, 0.24, Math.cos(i * 1.047) * 0.52, Math.sin(i * 1.047) * 0.52, 0); sp.rotation.z = i * 1.047 - Math.PI / 2; }
+    part(body, G.sph, eye, 0.18, 0.18, 0.1, 0, 0.85, 0.26);
+  } else if (type === 'ghost') {           // the Ghostwriter: never where you last saw it
+    const pale = gmat(0xd8ecff, 'cape', { lift: 0.5 }), blue = Gl(0x7fd8ff, 'eye');
+    part(body, G.cone, pale, 0.95, 1.6, 0.95, 0, 1.1, 0); part(body, G.sph, pale, 0.58, 0.58, 0.58, 0, 2.0, 0);
+    part(body, G.sph, blue, 0.14, 0.18, 0.1, -0.13, 2.02, 0.26); part(body, G.sph, blue, 0.14, 0.18, 0.1, 0.13, 2.02, 0.26);
+    part(body, G.cone4, Gl(0xffffff, 'quill'), 0.1, 0.9, 0.05, 0.62, 1.5, 0.2).rotation.z = -0.4;
+  } else if (type === 'redactor') {        // a slab that blacks things out
+    const slab = gmat(0x6a58a8, 'brick', { lift: 0.3 }), bar = Gl(0xffffff, 'gold');
+    part(body, G.box, slab, 1.5, 2.6, 0.7, 0, 1.3, 0);
+    for (let i = 0; i < 3; i++) part(body, G.box, bar, 1.15 - i * 0.2, 0.13, 0.06, -i * 0.1, 0.7 + i * 0.45, 0.37);
+    part(body, G.box, eye, 0.95, 0.18, 0.1, 0, 2.2, 0.37);
+    o.armL = part(body, G.box, ink2, 0.4, 1.5, 0.5, -1.0, 1.3, 0.1); o.armR = part(body, G.box, ink2, 0.4, 1.5, 0.5, 1.0, 1.3, 0.1);
+  } else if (type === 'mimic') {
+    o.lid = chestParts(body);
+    for (let i = -2; i <= 2; i++) part(body, G.cone4, Gl(0xffffff, 'quill'), 0.13, 0.24, 0.13, i * 0.19, 0.68, 0.3);
+    part(o.lid, G.sph, eye, 0.17, 0.17, 0.1, -0.22, 0.2, 0.72); part(o.lid, G.sph, eye, 0.17, 0.17, 0.1, 0.22, 0.2, 0.72);
   } else if (type === 'boss') {
     const bar = L(0xc0a0ff, 'boss'), dk = L(0x7a5ad0, 'boss'), red = Gl(0xff3a5a, 'eye');
     o.head = new THREE.Group(); o.head.position.y = 2.7; body.add(o.head);
@@ -450,4 +473,19 @@ export function makeLoot(slot, hex) {
   const beam = part(g, G.cyl, Gl(hex, 'bolt'), 0.12, 1, 0.12, 0, 0.5, 0);
   const halo = part(g, G.ring, Gl(hex, 'gold', { side: THREE.DoubleSide }), 0.75, 0.75, 0.75, 0, 0.04, 0); halo.rotation.x = -Math.PI / 2;
   return { g: noShadow(g), it, beam, halo };
+}
+
+// ---------- hidden things: a chest (the mimic wears the same one), and the thin light over something buried
+function chestParts(parent) {
+  const wood = gmat(0xc8a060, 'wood', { lift: 0.35 }), gold = Gl(0xffd98a, 'gold');
+  part(parent, G.box, wood, 1.0, 0.55, 0.7, 0, 0.3, 0); part(parent, G.box, gold, 0.16, 0.2, 0.06, 0, 0.42, 0.36);
+  const lid = new THREE.Group(); lid.position.set(0, 0.58, -0.35); parent.add(lid);
+  part(lid, G.box, wood, 1.04, 0.26, 0.74, 0, 0.13, 0.35); part(lid, G.box, gold, 1.08, 0.07, 0.78, 0, 0.02, 0.35);
+  return lid;
+}
+export function makeChest() { const g = new THREE.Group(); chestParts(g); return noShadow(g); }
+export function makeGlint() {
+  const g = new THREE.Group(); part(g, G.cyl, Gl(0xfff1c9, 'bolt'), 0.09, 1, 0.09, 0, 0.5, 0);
+  part(g, G.ring, Gl(0xfff1c9, 'gold', { side: THREE.DoubleSide }), 0.5, 0.5, 0.5, 0, 0.04, 0).rotation.x = -Math.PI / 2;
+  return noShadow(g);
 }

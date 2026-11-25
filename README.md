@@ -32,6 +32,20 @@ Something is deleting the world one word at a time. You are the last Scribe. The
 - **Elixirs** are scattered over the whole world, about ninety of them: gold gives experience, blue refills ink, red heals. Kills and letters give experience too.
 - Each level adds 20% damage and 10 ink, and every second level adds a point of health. Levels, weapon and collected elixirs are saved.
 
+## The wilds
+
+The world is 237 x 170 units, 1.75 times its first size: each land now covers about as much ground as a third of the old map. Between the roads live five more unwriters:
+
+- **Typo**: small and quick, comes in fours, weaves as it runs at you.
+- **Asterisk**: a footnote with a fuse. It runs up, swells and bursts; the blast hurts other unwriters too, and a hit stops the fuse.
+- **Ghostwriter**: fades out, steps in next to you and fires three shots. It can only be hit while you can see it.
+- **Redactor**: a slab that slams the ground around it and, at half health, calls three Typos. Always drops something.
+- **Mimic**: some chests bite.
+
+## Hidden loot
+
+46 caches lie off the roads, counted in the HUD as SECRETS. **Chests** stand out in the wilds; some are guarded by a Redactor and some are Mimics. **Buried** caches show nothing until you stand almost on them, then glint: press E to dig. From the top of any tower, thin lights mark every buried cache nearby. Buried caches give two items and the best odds of gold and orange.
+
 ## Loot
 
 Unwriters drop gear, in four rarities: grey **common**, blue **magic**, gold **rare** and orange **legendary**. A drop stands under a pillar of letters in its colour, taller the rarer it is. Walk over it to pick it up; **I** (or the BAG button) opens your bag, where you wear it or salvage it for experience.
