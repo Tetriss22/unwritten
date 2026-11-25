@@ -174,6 +174,24 @@ body.cap #card, body.cap #msg, body.cap #hint, body.cap #tools, body.cap #arrow,
 .aud input[type=range] { width: 100%; accent-color: #fff1c9; touch-action: auto; height: 22px; }
 .aud .tr div { display: flex; align-items: center; gap: 10px; } .aud .tr span { flex: 1; text-align: center; color: var(--gold); font-weight: 800; letter-spacing: .3em; }
 @media (max-width: 560px) { .rec { grid-template-columns: 1fr auto; } .rec i { grid-column: 1; } #secrets { font-size: 9px; } }
+/* the bag as a grid of things drawn in symbols */
+#bag .box { width: min(1080px, 97vw); }
+#bag .cols { grid-template-columns: .95fr 1.25fr 1.05fr; }
+#bag pre { margin: 0; font: 800 11px/1.08 "JetBrains Mono", monospace; color: var(--rc, #c8c4e0); text-shadow: 0 0 8px color-mix(in srgb, var(--rc, #c8c4e0) 60%, transparent); white-space: pre; }
+#bagList, #bagWeapons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; max-height: none; overflow: visible; }
+.tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 84px; padding: 7px 3px 5px; border: 1px solid #2a2840; background: rgba(255,255,255,.02); text-align: center; letter-spacing: 0; }
+button.tile { cursor: pointer; border-color: color-mix(in srgb, var(--rc, #c8c4e0) 45%, #1a1830); }
+.tile span { font-size: 9px; line-height: 1.25; color: var(--rc, #c8c4e0); letter-spacing: .02em; }
+.tile small { font-size: 8px; letter-spacing: .14em; color: var(--dim); }
+.tile.sel { border-color: var(--rc, #fff1c9); background: rgba(255,255,255,.08); box-shadow: 0 0 12px color-mix(in srgb, var(--rc, #fff1c9) 35%, transparent); }
+.tile.none pre { color: #2a2840; text-shadow: none; }
+.tile.wp { --rc: #e9e6f5; min-height: 78px; } .tile.wp.cur { --rc: #fff1c9; border-color: #fff1c9; } .tile.wp.locked { opacity: .4; }
+.it .hd { display: flex; gap: 12px; align-items: center; } .it .hd pre { font-size: 13px; }
+.it .fl { color: #a8a4c4; font-style: italic; margin: 8px 0 2px; font-size: 11px; line-height: 1.5; }
+.it.empty { display: flex; gap: 10px; align-items: center; line-height: 1.6; letter-spacing: .04em; } .it.empty pre { color: #3a3860; text-shadow: none; }
+.it.wpn { --rc: #fff1c9; }
+#bagMats { display: flex; gap: 14px; font-size: 11px; color: var(--dim); } #bagMats div { display: flex; gap: 6px; align-items: center; } #bagMats b { color: #fff; font-size: 13px; } #bagMats pre { color: #c9b8ff; }
+@media (max-width: 760px) { #bag .cols { grid-template-columns: 1fr; } .tile { min-height: 70px; } }
 #err { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 30px; text-align: center; color: var(--pink); line-height: 1.7; }
 </style>
 </head>
@@ -226,8 +244,8 @@ body.cap #card, body.cap #msg, body.cap #hint, body.cap #tools, body.cap #arrow,
 <div id="bag" class="screen"><div class="box">
   <h2><span>YOUR BAG <small id="bagCount" style="color:var(--dim);letter-spacing:.2em"></small></span><button id="bagClose" type="button">CLOSE [I]</button></h2>
   <div class="cols">
-    <div class="col"><span>WORN</span><div id="gearSlots"></div><span style="margin-top:8px">TOTAL</span><div id="gearTot"></div></div>
-    <div class="col"><span>CARRIED</span><div id="bagList"></div></div>
+    <div class="col"><span>WORN</span><div id="gearSlots"></div><span style="margin-top:8px">TOTAL</span><div id="gearTot"></div><span style="margin-top:10px">MATERIALS</span><div id="bagMats"></div></div>
+    <div class="col"><span>CARRIED</span><div id="bagList"></div><span style="margin-top:10px">WEAPONS &middot; Q SWITCHES</span><div id="bagWeapons"></div></div>
     <div class="col"><span>SELECTED</span><div id="bagInfo"></div><div id="bagAct" style="display:flex"><button id="bagEquip" type="button">WEAR IT</button><button id="bagSalv" type="button">SALVAGE: XP + DUST</button><button id="bagJunk" type="button">SALVAGE ALL GREY</button></div></div>
   </div>
 </div></div>

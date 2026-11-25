@@ -489,24 +489,49 @@ function lootLabels(near) {
     const [x, y] = R.toScreen(d.cx, d.cy, 1.25); d.lab.style.display = 'block'; d.lab.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
   }
 }
-// ---- the bag
+// ---- the bag: every thing has a picture made of symbols, and a line about what it is
+const ICON = {
+  robe: [' _^_ ', '/|#|\\', ' |#| ', ' /_\\ '],
+  ring: ['  o  ', ' .-. ', '( O )', " '-' "],
+  charm: ['  |  ', ' /^\\ ', '< @ >', ' \\v/ '],
+};
+const WICON = {
+  QUILL: ['    /', '   / ', '  /  ', ' "   '], BLADE: ['  ^  ', '  #  ', '  #  ', ' -+- '], NIBS: [' ^ ^ ', ' | | ', ' | | ', ' + + '],
+  SWORD: ['  ^  ', '  |  ', '  |  ', ' =+= '], SABRE: ['   _.', '  / )', ' / / ', '=+   '], PIKE: ['  A  ', '  |  ', '  |  ', '  |  '],
+  BOW: [' |\\  ', ' | ) ', ' | ) ', ' |/  '], HAMMER: ['[###]', '  |  ', '  |  ', '  |  '],
+};
+const WDESC = { QUILL: 'What you started with. Quick three-hit combo ending in a spin.', BLADE: 'A broad letter-opener. Slow, triple damage, shakes the page.', NIBS: 'Twin short blades. Very fast, very close.' };
+const FLAVOR = { Robe: 'Plain cloth. The letters on it are small and close.', Coat: 'Heavy, with deep pockets for loose words.', Mantle: 'Worn over everything. It moves a moment after you do.', Ring: 'A closed loop. Nothing written on it ever ends.', Band: 'Flat and wide, stamped out of a margin rule.', Loop: 'A single stroke bent round to meet itself.', Charm: 'A small mark you keep for luck.', Seal: 'Pressed wax, still warm at the centre.', Bookmark: 'It remembers where you were.' };
+const RAR_NOTE = ['One stat.', 'Two stats.', 'Three stats.', 'Three stats and a power of its own.'];
+const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function iconHTML(lines, rar = 0) { const l = lines.slice(); if (rar >= 2) { const m = rar === 3 ? '*' : '+'; l[0] = m + l[0].slice(1, -1) + m; } return '<pre>' + esc(l.join('\n')) + '</pre>'; }
+const flavor = (it) => { const k = Object.keys(FLAVOR).find(k => it.name.includes(k)); return k ? FLAVOR[k] : 'There is only one of these.'; };
 const statLine = (k, v, cmp) => { const c = cmp === undefined ? '' : cmp > v ? ' <em class="dn">&#9660;</em>' : cmp < v ? ' <em class="up">&#9650;</em>' : ''; return `<li>${AFX[k].t(v)}${c}</li>`; };
-function itemHTML(it, vs) {
-  if (!it) return '<div class="it empty">empty</div>';
+function itemHTML(it, vs, small) {
+  if (!it) return '<div class="it empty"><pre>  .  \n . . \n  .  </pre>empty</div>';
   const r = RARITY[it.rar], leg = it.fx && LEGENDS.find(l => l.fx === it.fx);
   const p = vs !== undefined ? itemPower(it) - itemPower(vs) : 0;
-  return `<div class="it r${it.rar}"><b>${it.name}</b><small>${r.name} ${it.slot.toUpperCase()} &middot; item level ${it.il}</small><ul>${Object.entries(it.aff).map(([k, v]) => statLine(k, v, vs ? vs.aff[k] ?? 0 : undefined)).join('')}${vs ? Object.entries(vs.aff).filter(([k]) => !(k in it.aff)).map(([k, v]) => `<li class="dn">lose ${AFX[k].t(v)}</li>`).join('') : ''}</ul>${leg ? `<p>${leg.desc}</p>` : ''}${vs !== undefined ? `<i class="${p > 0 ? 'up' : p < 0 ? 'dn' : ''}">${p > 0 ? 'BETTER' : p < 0 ? 'WORSE' : 'SAME'} than what you wear</i>` : ''}</div>`;
+  return `<div class="it r${it.rar}"><div class="hd">${iconHTML(ICON[it.slot], it.rar)}<div><b>${it.name}</b><small>${r.name} ${it.slot.toUpperCase()} &middot; item level ${it.il}</small></div></div>${small ? '' : `<p class="fl">${flavor(it)} ${RAR_NOTE[it.rar]}</p>`}<ul>${Object.entries(it.aff).map(([k, v]) => statLine(k, v, vs ? vs.aff[k] ?? 0 : undefined)).join('')}${vs ? Object.entries(vs.aff).filter(([k]) => !(k in it.aff)).map(([k, v]) => `<li class="dn">lose ${AFX[k].t(v)}</li>`).join('') : ''}</ul>${leg ? `<p>${leg.desc}</p>` : ''}${vs !== undefined ? `<i class="${p > 0 ? 'up' : p < 0 ? 'dn' : ''}">${p > 0 ? 'BETTER' : p < 0 ? 'WORSE' : 'SAME'} than what you wear</i>` : ''}</div>`;
 }
 function renderBag() {
-  const sel = P.bag.find(b => b.id === S.bagSel) || P.bag[0], st = GS();
+  const selW = S.bagW !== undefined && S.bagW !== null ? WEAPONS[S.bagW] : null, sel = selW ? null : P.bag.find(b => b.id === S.bagSel) || P.bag[0], st = GS();
   if (sel) S.bagSel = sel.id;
-  $('gearSlots').innerHTML = SLOTS.map(s => `<div class="slot"><span>${s.toUpperCase()}</span>${itemHTML(P.gear[s])}</div>`).join('');
-  const tot = [['damage', `${Math.round((P.dmgMul - 1) * 100)}%`], ['hearts', P.maxHp], ['ink', P.maxInk], ['crit', st.crit + '%'], ['speed', '+' + st.speed + '%'], ['ink/s', (2.5 + st.regen).toFixed(1)]];
+  $('gearSlots').innerHTML = SLOTS.map(s => `<div class="slot"><span>${s.toUpperCase()}</span>${itemHTML(P.gear[s], undefined, true)}</div>`).join('');
+  const tot = [['damage', `+${Math.round((P.dmgMul - 1) * 100)}%`], ['hearts', P.maxHp], ['ink', P.maxInk], ['crit', st.crit + '%'], ['speed', '+' + st.speed + '%'], ['ink/s', (2.5 + st.regen).toFixed(1)]];
   $('gearTot').innerHTML = tot.map(([a, b]) => `<span>${a} <b>${b}</b></span>`).join('');
-  $('bagList').innerHTML = P.bag.length ? P.bag.map(b => `<button type="button" data-id="${b.id}" class="row r${b.rar}${sel && b.id === sel.id ? ' sel' : ''}">${b.name}<small>${b.slot}</small></button>`).join('') : '<p class="none">Nothing yet. Unwriters drop things: grey, blue, gold and, rarely, orange.</p>';
-  $('bagCount').textContent = P.bag.length + '/' + BAG_MAX;
-  $('bagInfo').innerHTML = sel ? itemHTML(sel, P.gear[sel.slot] || null) : '';
-  $('bagAct').style.display = sel ? 'flex' : 'none';
+  $('bagMats').innerHTML = `<div><pre>.:*:.</pre><b>${P.mats.dust}</b> dust</div><div><pre>&lt;*&gt;</pre><b>${P.mats.ess}</b> essence</div>`;
+  let tiles = P.bag.map(b => `<button type="button" data-id="${b.id}" class="tile r${b.rar}${sel && b.id === sel.id ? ' sel' : ''}">${iconHTML(ICON[b.slot], b.rar)}<span>${b.name}</span></button>`).join('');
+  for (let k = P.bag.length; k < BAG_MAX; k++) tiles += '<div class="tile none"><pre>     \n  .  \n     \n     </pre></div>';
+  $('bagList').innerHTML = tiles; $('bagCount').textContent = P.bag.length + '/' + BAG_MAX;
+  $('bagWeapons').innerHTML = WEAPONS.map((w, k) => { const ok = canUse(w); return `<button type="button" data-w="${k}" class="tile wp${ok ? '' : ' locked'}${P.weapon === k ? ' cur' : ''}${selW === w ? ' sel' : ''}">${iconHTML(WICON[w.name])}<span>${w.name}</span><small>${P.weapon === k ? 'IN HAND' : ok ? 'OWNED' : w.craft ? 'SMITH' : 'LEVEL ' + w.lvl}</small></button>`; }).join('');
+  if (selW) {
+    const ok = canUse(selW);
+    $('bagInfo').innerHTML = `<div class="it wpn"><div class="hd">${iconHTML(WICON[selW.name])}<div><b>${selW.name}</b><small>WEAPON &middot; ${ok ? 'OWNED' : selW.craft ? 'A SMITH MAKES IT: ' + selW.cost[0] + ' DUST' + (selW.cost[1] ? ' + ' + selW.cost[1] + ' ESSENCE' : '') : 'OPENS AT LEVEL ' + selW.lvl}</small></div></div><p class="fl">${selW.desc || WDESC[selW.name]}</p><ul><li>${Math.round(selW.dmg * 10)} damage a hit</li><li>${selW.bow ? 'ranged' : 'reach ' + selW.range.toFixed(1)}</li><li>${(1 / (selW.cd + selW.dur * 0.5)).toFixed(1)} strikes a second</li></ul></div>`;
+    $('bagAct').style.display = 'flex'; $('bagEquip').style.display = ok && P.weapon !== S.bagW ? '' : 'none'; $('bagEquip').textContent = 'TAKE IN HAND'; $('bagSalv').style.display = 'none';
+  } else {
+    $('bagInfo').innerHTML = sel ? itemHTML(sel, P.gear[sel.slot] || null) : '<div class="it empty">Nothing carried yet. Unwriters drop things: grey, blue, gold and, rarely, orange. Chests and buried caches hold more.</div>';
+    $('bagAct').style.display = sel ? 'flex' : 'none'; $('bagEquip').style.display = ''; $('bagEquip').textContent = 'WEAR IT'; $('bagSalv').style.display = '';
+  }
 }
 function toggleBag(force) {
   if (S.mode !== 'play' && !$('bag').classList.contains('on')) return;
@@ -515,8 +540,9 @@ function toggleBag(force) {
   if (on) renderBag();
 }
 function bindBag() {
-  $('bagList').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { S.bagSel = b.dataset.id; renderBag(); } });
-  $('bagEquip').addEventListener('click', () => { const it = P.bag.find(b => b.id === S.bagSel); if (it) { equip(it); S.bagSel = null; renderBag(); } });
+  $('bagList').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { S.bagSel = b.dataset.id; S.bagW = null; renderBag(); } });
+  $('bagWeapons').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { S.bagW = +b.dataset.w; renderBag(); } });
+  $('bagEquip').addEventListener('click', () => { if (S.bagW !== undefined && S.bagW !== null) { if (canUse(WEAPONS[S.bagW])) setWeapon(S.bagW); return renderBag(); } const it = P.bag.find(b => b.id === S.bagSel); if (it) { equip(it); S.bagSel = null; renderBag(); } });
   $('bagSalv').addEventListener('click', () => { const it = P.bag.find(b => b.id === S.bagSel); if (it) { salvage(it); S.bagSel = null; renderBag(); } });
   $('bagJunk').addEventListener('click', () => { P.bag.filter(b => b.rar === 0).forEach(salvage); renderBag(); });
   $('bagClose').addEventListener('click', () => toggleBag(false));
@@ -607,10 +633,11 @@ function updateFire(dt) {
       if (f.t > 1.2) { W.B.scorch(f.bx * FB, f.by * FB, FB, 2); W.fires.delete(key); W.burnt.add(key); W.fireDirty = true; }
       else if (Math.random() < dt * 1.2) burst(cx, cy, 0.3, 1, Math.random() < 0.5 ? 0xffb050 : 0xff6a3a, 2.4);
     }
+    W.fireGlow = (W.fireGlow || 0) - dt; if (W.fireGlow <= 0) { W.fireGlow = 0.1; const fs = [...W.fires.values()], f = fs[Math.floor(Math.random() * fs.length)]; if (f) glow((f.bx + 0.5) * FB / 8, (f.by + 0.5) * FB / 8, 7, 1.8, [1, 0.55, 0.2], 0.45); }
     W.fireTick = (W.fireTick || 0) - dt;
     if (W.fireTick <= 0) {
       W.fireTick = 0.4; const fs = [...W.fires.values()], f = fs[Math.floor(Math.random() * fs.length)];
-      if (f) { glow((f.bx + 0.5) * FB / 8, (f.by + 0.5) * FB / 8, 7, 1.3, [1, 0.5, 0.2], 0.5); if (dist(P.x, P.y, (f.bx + 0.5) * FB / 8, (f.by + 0.5) * FB / 8) < 30) audio.play('fire'); }
+      if (f) { glow((f.bx + 0.5) * FB / 8, (f.by + 0.5) * FB / 8, 9, 2.0, [1, 0.5, 0.2], 0.6); if (dist(P.x, P.y, (f.bx + 0.5) * FB / 8, (f.by + 0.5) * FB / 8) < 30) audio.play('fire'); }
       for (const e of W.enemies) if (!e.dead && e.type !== 'boss' && W.fires.has(fkey(Math.floor(e.x * 8 / FB), Math.floor(e.y * 8 / FB)))) hitEnemy(e, roll(0.7, 'fire')[0], rnd(6.28), true);
     }
   }
