@@ -201,6 +201,9 @@ const PLACES = {
   // IV Whiteout Pass (south-east)
   P0: [103, 59, 2.8, 3], P1: [112, 67, 3, 3], P2: [96, 68, 3.3, 3], P3: [118, 79, 3, 3], P4: [104, 81, 3, 3], P5: [88, 75, 3, 3],
   PgA: [113.5, 62.2, 2.2, 3], PgB: [120, 56.6, 2.2, 3], PL: [121.6, 51.6, 3, 3], S2: [84, 82, 2.2, 3],
+  // towns: a square, a ring of houses, people and makers. T1 Wheatham, T2 Fordmill, T3 Stillwater, T4 Emberwick, T5 Coldharbour
+  T1: [49, 72.5, 4.3, 0], T2: [43, 49, 4.2, 0], T3: [56, 29, 4.2, 1], T4: [90, 38.5, 4.2, 2], T5: [79, 73.5, 4.2, 3],
+  Tf1: [56, 75.5, 5.2, 0, 1], Tf2: [44, 65.5, 4.6, 0, 1], Tf3: [49.5, 54, 4.8, 0, 1], Tf4: [37, 43.5, 4.4, 0, 1], Tf5: [41.5, 76, 4.2, 0, 1], Tf6: [24, 47, 4.4, 0, 1],
   // V  the Blank (the hole in the middle of the page)
   sB: [64, 67, 2.2, 4], B1: [56.5, 62, 2.7, 4], B2: [71.5, 62, 2.7, 4], B3: [64, 58.5, 2.9, 4], eA: [64, 54, 2, 4], AR: [64, 41.5, 7.2, 4],
 };
@@ -209,6 +212,7 @@ const ROADS = [
   'W2-D0', 'D0-D1', 'D0-D4', 'D1-D2', 'D1-D3', 'D2-D3', 'D3-D4', 'D2-D5', 'D3-D6', 'D5-D6', 'D6-DgA', 'D4-DgA', 'DgB-DL', 'D4-N1', 'N1-N2', 'N2-N3',
   'N3-C0', 'C0-C1', 'C0-C2', 'C1-C4', 'C2-C3', 'C2-C5', 'C3-C4', 'C1-C3', 'C3-CgA', 'C5-CgA', 'CgB-CL', 'C5-E1', 'E1-P0',
   'P0-P1', 'P0-P2', 'P1-P3', 'P2-P4', 'P2-P5', 'P3-P4', 'P4-P5', 'P1-PgA', 'PgB-PL', 'P5-S2', 'S2-XS',
+  'T1-S1', 'T1-M5', 'T2-W1', 'T3-N1', 'T3-N2', 'T4-C2', 'T4-E1', 'T5-P5', 'T5-S2',
   'sB-B1', 'sB-B2', 'sB-B3', 'B1-B3', 'B2-B3', 'B3-eA',
 ];
 // crossings that do not exist until something is written
@@ -242,6 +246,30 @@ const PEOPLE = [
   ['E1', 1.4, 0.8, 'Carter', 'Red ink ahead. Where a ring appears on the ground, do not be standing in it.'],
   ['P0', 1.8, 1.0, 'Hermit', 'The wall is ice. Ice is only water that forgot the word FIRE.'],
   ['sA', 1.3, 0.6, 'Gatekeeper', 'No road north yet. It gets written when four lanterns burn.'],
+  // makers trade at a stall: [place, dx, dy, name, line, craft]
+  ['M2', -2.2, 1.6, 'Smith Orla', 'Dust and essence. Bring me both and I will make you something with an edge.', 'smith'],
+  ['T1', -2.4, -1.6, 'Smith Bram', 'Sword, sabre, pike, bow or hammer. Pick one.', 'smith'],
+  ['T1', 2.6, -1.2, 'Alchemist Wren', 'I bottle what the unwriters leave behind.', 'alchemist'],
+  ['T1', 0.6, 2.6, 'Reaper Tam', 'Mind your fire near the wheat. One spark and the whole field goes.'],
+  ['T1', -1.6, 2.2, 'Baker Sol', 'Wheatham bread, best on the page. There was more of the town, before the edits.'],
+  ['T1', 2.4, 1.8, 'Little Pip', 'I saw a chest in the woods! It had teeth. I did not open it.'],
+  ['T2', -2.2, -1.4, 'Outfitter Maud', 'Robes, rings, charms. Or I can roll again what you already wear.', 'tailor'],
+  ['T2', 2.2, -1.6, 'Ford-warden', 'North is the drowned library. Stay on the stones, the water slows you.'],
+  ['T2', 0.4, 2.6, 'Mill-hand Jory', 'Break down what you do not wear. The dust is worth more than the thing.'],
+  ['T2', -2.4, 1.6, 'Old Hesper', 'Climb a tower and look for thin lights. That is where they buried what they could not carry.'],
+  ['T3', -2.2, -1.5, 'Outfitter Lune', 'Everything here is damp. My needles are not.', 'tailor'],
+  ['T3', 2.4, -1.2, 'Alchemist Ives', 'Deep ink. Drink it once and your well never runs as dry again.', 'alchemist'],
+  ['T3', 0.2, 2.6, 'Archivist', 'A Ghostwriter can only be struck while you can see it. Wait for it to step in.'],
+  ['T3', -2.4, 1.8, 'Diver', 'There are chests under the reeds, out past the last shelf.'],
+  ['T4', -2.2, -1.5, 'Smith Kessa', 'Everything in Emberwick has been forged twice. Once by us, once by the fire.', 'smith'],
+  ['T4', 2.3, -1.4, 'Cinder-seller', 'An Asterisk swells before it bursts. Hit it and the fuse goes out.'],
+  ['T4', 0.3, 2.6, 'Soot-child', 'The Redactor near the gate hit the ground and my teeth shook.'],
+  ['T4', -2.4, 1.7, 'Lamplighter', 'Write RAIN and the red ink cools. Until then, walk around it.'],
+  ['T5', -2.3, -1.5, 'Smith Halvard', 'A bow carries from a tower top. Nothing else does.', 'smith'],
+  ['T5', 2.3, -1.4, 'Outfitter Yrsa', 'Gold thread costs essence. The rare ones always do.', 'tailor'],
+  ['T5', 0.2, 2.7, 'Alchemist Ode', 'Cold hands, warm bottles.', 'alchemist'],
+  ['T5', -2.5, 1.7, 'Trapper', 'The pass is ice. Ice is water that forgot a word. You will work it out.'],
+  ['T5', 2.5, 1.7, 'Watchman', 'Past here, the page goes blank. The Editor sits in the middle of it.'],
 ];
 const LETTERS = [
   [0, 'M1', []], [0, 'M2', ['blot']], [0, 'M3', ['blot', 'blot']], [0, 'M4', ['blot', 'blot']], [0, 'M5', ['blot', 'blot', 'blot']], [0, 'M6', ['blot', 'blot', 'scratch']],
@@ -261,7 +289,7 @@ export const TEXTS = [...GATES.map(g => g.text), 'the world was written and then
 
 export function buildWorld() {
   const [wu, hu] = SIZE, T = new Terrain(wu, hu), R = rng(90210);
-  const nodes = Object.entries(PLACES).map(([id, [x, y, r, land, field]]) => ({ id, x: x * K, y: y * K, r, land, field: !!field }));
+  const nodes = Object.entries(PLACES).map(([id, [x, y, r, land, field]]) => ({ id, x: x * K, y: y * K, r, land, field: !!field, town: /^T\d$/.test(id) }));
   const N = Object.fromEntries(nodes.map(n => [n.id, n]));
   const edges = ROADS.map(s => { const [a, b] = s.split('-').map(k => N[k]); return { a, b, w: Math.min(LANDS[a.land].edgeW, LANDS[b.land].edgeW) }; });
   const strips = STRIPS.map(([land, hw, pts]) => ({ land, hw, pts: pts.map(([x, y]) => [x * K, y * K]) }));
@@ -318,7 +346,7 @@ export function buildWorld() {
       if (land === 1 || (pond && land === 0)) { T.put(cx, cy, '~', land * 16 + (land === 1 ? 7 : 5), 0.9, 1); T.tag[i] = 3; }
       else if (pond && land === 3) { paint(T, cx, cy, m.ice, seed, land); T.tag[i] = 2; }
       else if (far && land === 0 && fbm(ux * 0.12, uy * 0.12, 400) > 0.7) paint(T, cx, cy, m.path, seed, land);
-      else if (far && land === 0 && fbm(ux * 0.1, uy * 0.1, 450) > 0.68) paint(T, cx, cy, m.field, seed, land);
+      else if (far && land === 0 && fbm(ux * 0.1, uy * 0.1, 450) > 0.61) paint(T, cx, cy, m.field, seed, land);
       else paint(T, cx, cy, m.outside, seed, land);
       continue;
     }
@@ -358,16 +386,31 @@ export function buildWorld() {
   for (const n of nodes) {
     const build = LANDS[n.land].props.build;
     if (n.field || /g[AB]$|^s[AB]$|^eA$|^AR$/.test(n.id)) continue;
-    for (let k = 0; k < (n.r > 2.4 ? 3 : 2); k++) for (let tries = 0; tries < 14; tries++) {
-      const ang = backA + (R() - 0.5) * 3.4, d = n.r + 2.2 + R() * 3.4, x = n.x + Math.cos(ang) * d, y = n.y + Math.sin(ang) * d;
+    for (let k = 0; k < (n.town ? 9 : n.r > 2.4 ? 3 : 2); k++) for (let tries = 0; tries < 14; tries++) {
+      const ang = n.town ? R() * 6.283 : backA + (R() - 0.5) * 3.4, d = n.r + 2.2 + R() * (n.town ? 4.6 : 3.4), x = n.x + Math.cos(ang) * d, y = n.y + Math.sin(ang) * d;
       if (x < 3 || y < 3 || x > wu - 3 || y > hu - 3 || walk(x, y) < 1.8 || stripAt(x, y, 2.2) || hides(x, y)) continue;
       if (sites.some(q => Math.hypot(q.x - x, q.y - y) < 3.9)) continue;
-      const type = pick(build), face = Math.atan2(n.x - x, n.y - y);
+      const type = n.town ? (n.land === 3 ? 'cabin' : k === 8 && n.land === 0 ? 'windmill' : 'house') : pick(build), face = Math.atan2(n.x - x, n.y - y);
       sites.push({ x, y }); props.push({ type, x, y, s: 0.95 + R() * 0.25, rot: face + (R() - 0.5) * 0.5, v: R(), build: true });
       lamps.push({ x: x + Math.sin(face) * 1.8, y: y + Math.cos(face) * 1.8, r: 3.4, col: LANDS[n.land].props.lampCol, int: 0.7, ph: R() * 6 });
       break;
     }
   }
+  // every maker has a stall behind them, its awning in their trade's colour
+  const makerAt = {};
+  PEOPLE.forEach(([id, dx, dy, , , shop], k) => {
+    if (!shop) return; const n = N[id]; let best = null, bs = 1e9;
+    for (let i = 0; i < 32; i++) {      // a spot on the rim of the place, off every road, as far back as there is room
+      const a = i / 32 * 6.283, x = n.x + Math.cos(a) * (n.r + 1.1), y = n.y + Math.sin(a) * (n.r + 1.1);
+      if (walk(x, y) < 0.95 || stripAt(x, y, 1.5) || sites.some(q => Math.hypot(q.x - x, q.y - y) < 2.7)) continue;
+      let da = Math.abs(a - backA) % 6.283; if (da > Math.PI) da = 6.283 - da; if (da < bs) { bs = da; best = [x, y]; }
+    }
+    if (!best) best = [n.x + dx + back[0] * 1.5, n.y + dy + back[1] * 1.5];
+    const [x, y] = best, d = Math.hypot(n.x - x, n.y - y) || 1;
+    sites.push({ x, y }); props.push({ type: 'stall', x, y, s: 1, rot: Math.atan2(n.x - x, n.y - y), v: { smith: 0.1, tailor: 0.5, alchemist: 0.9 }[shop] });
+    makerAt[k] = [x + (n.x - x) / d * 1.5, y + (n.y - y) / d * 1.5];
+  });
+  for (const n of nodes) if (n.town) { const x = n.x + 1.3, y = n.y + 0.4; sites.push({ x, y }); props.push({ type: 'well', x, y, s: 0.9, rot: 0, v: R() }); }
   // things people leave around buildings: wells, crates, carts; signposts where roads meet
   const DETAIL = [['well', 'crates', 'cart', 'crates'], ['crates'], ['crates'], ['crates', 'cart'], []];
   for (const q of sites.slice()) {
@@ -454,7 +497,7 @@ export function buildWorld() {
     props.push({ type: forest ? pick(P.border) : pick(P.low.concat(P.inner)), x, y, s: 0.8 + R() * 0.55, rot: R() * 6.28, v: R() });
   }
   // what you cannot walk through
-  const HARD = { tree: 0.32, cypress: 0.32, pine: 0.34, deadtree: 0.28, tower: 1.0, watchtower: 0.95, windmill: 1.3, burnt: 1.5, well: 0.75, crates: 0.7, cart: 0.85, hay: 0.55, boulder: 0.7, column: 0.4, shelf: 0.6, wall: 0.7, stone: 0.3 };
+  const HARD = { stall: 0.9, tree: 0.32, cypress: 0.32, pine: 0.34, deadtree: 0.28, tower: 1.0, watchtower: 0.95, windmill: 1.3, burnt: 1.5, well: 0.75, crates: 0.7, cart: 0.85, hay: 0.55, boulder: 0.7, column: 0.4, shelf: 0.6, wall: 0.7, stone: 0.3 };
   const towers = [];
   for (const p of props) {
     const r = HARD[p.type];
@@ -464,7 +507,7 @@ export function buildWorld() {
     if (p.type === 'tower') towers.push({ x: p.x, y: p.y, top: (3.8 + p.v * 1.4 + 0.3) * p.s, rad: 0.72 * p.s, base: 1.0 * p.s });
     if (p.type === 'watchtower') towers.push({ x: p.x, y: p.y, top: (3.8 + p.v * 1.4 + 0.1) * p.s, rad: 0.6 * p.s, base: 0.95 * p.s });
   }
-  const npcs = PEOPLE.map(([id, dx, dy, name, line], k) => ({ x: N[id].x + dx, y: N[id].y + dy, name, line, hue: k }));
+  const npcs = PEOPLE.map(([id, dx, dy, name, line, shop], k) => ({ x: makerAt[k] ? makerAt[k][0] : N[id].x + dx, y: makerAt[k] ? makerAt[k][1] : N[id].y + dy, name, line, shop, hue: k }));
 
   const letters = LETTERS.map(([land, at, guards], k) => ({ land, x: N[at].x, y: N[at].y, guards, id: k }));
   LANDS.forEach((L, li) => letters.filter(l => l.land === li).forEach((l, k) => { l.ch = L.word[k]; }));
@@ -474,6 +517,16 @@ export function buildWorld() {
   return {
     T, N, nodes, edges, gates, props, lamps, letters, hazard, goals, centers, walk, towers, npcs,
     start: N.M0, roam: ROAM.map(([x, y, type]) => ({ x: x * K, y: y * K, type })), hearts: HEARTS.map(([x, y]) => ({ x: x * K, y: y * K })),
+    // a block of crop catches (stage 1: flame letters) and then is ash (stage 2)
+    scorch(cx0, cy0, n, stage) {
+      if (!T.fire) T.fire = new Uint8Array(T.w * T.h);
+      for (let cy = cy0; cy < cy0 + n; cy++) for (let cx = cx0; cx < cx0 + n; cx++) {
+        if (cx < 0 || cy < 0 || cx >= T.w || cy >= T.h) continue;
+        const i = cy * T.w + cx, k = T.data[i * 4 + 3], a = h2(cx, cy, 77), b = h2(cx, cy, 78);
+        if (stage === 1) { if ((k & 127) !== 8) continue; T.put(cx, cy, '^*~W'[Math.floor(a * 4)], 2 * 16 + [5, 9, 6][Math.floor(b * 3)], 1.5, 3 | (k & 128)); T.fire[i] = 1; }
+        else if (T.fire[i] === 1) { T.put(cx, cy, ASH[Math.floor(a * ASH.length)], T.reg[i] * 16 + 3, 0.22 + b * 0.25, k & 128); T.fire[i] = 2; }
+      }
+    },
     paintGate(g, cx, cy) { const L = LANDS[g.land]; paint(T, cx, cy, L.mats.bridge, L.seed, g.land, g.tid); const i = cy * T.w + cx; T.solid[i] = 0; T.tag[i] = 0; T.data[i * 4 + 3] |= 128; },
     coolHazard() { const L = LANDS[2]; for (const [cx, cy] of hazard) { paint(T, cx, cy, L.mats.cooled, L.seed, 2); T.tag[cy * T.w + cx] = 0; T.data[(cy * T.w + cx) * 4 + 3] |= 128; } },
     // a lit lantern makes its whole land easier to read

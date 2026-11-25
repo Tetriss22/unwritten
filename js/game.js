@@ -4,7 +4,7 @@ import { Renderer, SY, CY, SINP, MAX_LIGHTS, MAX_ERASE, MAX_PULSE } from './rend
 import { LANDS, SIZE, TEXTS, buildWorld, rng } from './terrain.js';
 import * as M from './models.js';
 import { gmat } from './glyph.js';
-import { Audio } from './audio.js';
+import { Audio, TRACKS } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -18,7 +18,7 @@ const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random(
 const audio = new Audio();
 let R = null, W = null;
 const S = { mode: 'boot', land: 0, landT: 0, t: 0, camX: 0, camY: 0, shake: 0, hitstop: 0, flash: 0, reveal: 0, revealTo: 0, amb: 0, deaths: 0, runT: 0, paused: false, timers: [], zoom: 1.0, zoomTo: 1.0, zMin: 0.1, env: null };
-const P = { x: 0, y: 0, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: 5, maxHp: 5, inv: 0, dashT: 0, dashCd: 0, dx: 0, dy: 0, atkT: 0, atkDur: 0.24, atkCd: 0, combo: 0, comboT: 0, hitDone: true, walk: 0, stepT: 0, burnT: 0, cx: 0, cy: 0, m: null, h: 0, hTo: 0, up: null, mounted: false, zoomBack: 1.0, lvl: 1, xp: 0, ink: 60, maxInk: 60, dmgMul: 1, weapon: 0, gear: { robe: null, ring: null, charm: null }, bag: [], st: null, hits: 0 };
+const P = { x: 0, y: 0, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: 5, maxHp: 5, inv: 0, dashT: 0, dashCd: 0, dx: 0, dy: 0, atkT: 0, atkDur: 0.24, atkCd: 0, combo: 0, comboT: 0, hitDone: true, walk: 0, stepT: 0, burnT: 0, cx: 0, cy: 0, m: null, h: 0, hTo: 0, up: null, mounted: false, zoomBack: 1.0, lvl: 1, xp: 0, ink: 60, maxInk: 60, dmgMul: 1, weapon: 0, gear: { robe: null, ring: null, charm: null }, bag: [], st: null, hits: 0, mats: { dust: 0, ess: 0 }, owned: {}, perm: { ink: 0 } };
 const keys = new Set();
 const input = { mx: 0, my: 0, mouseT: -99, attack: false, held: false, dash: false, use: false, ride: false, fire: false, swap: false, s1: false, s2: false, sx: 0, sy: 0, stickId: null, ox: 0, oy: 0, pinch: 0 };
 const after = (sec, fn) => S.timers.push({ t: sec, fn });
@@ -31,7 +31,7 @@ const SAVE = 'unwritten.world.v3';      // v3: the world grew, old positions no 
 const readSave = () => { try { return JSON.parse(localStorage.getItem(SAVE) || 'null'); } catch (e) { return null; } };
 const clearSave = () => { try { localStorage.removeItem(SAVE); } catch (e) { /* storage unavailable */ } };
 function save() {
-  try { localStorage.setItem(SAVE, JSON.stringify({ taken: W.letters.filter(l => l.state === 'taken').map(l => l.id), lit: W.lands.map(l => l.lit), cp: [P.cx, P.cy], t: S.runT, d: S.deaths, lvl: P.lvl, xp: P.xp, wp: P.weapon, elx: W.elixirs.filter(e => e.gone).map(e => e.id), gear: P.gear, bag: P.bag, cch: W.caches.filter(c => c.gone).map(c => c.id) })); } catch (e) { /* storage unavailable */ }
+  try { localStorage.setItem(SAVE, JSON.stringify({ taken: W.letters.filter(l => l.state === 'taken').map(l => l.id), lit: W.lands.map(l => l.lit), cp: [P.cx, P.cy], t: S.runT, d: S.deaths, lvl: P.lvl, xp: P.xp, wp: P.weapon, elx: W.elixirs.filter(e => e.gone).map(e => e.id), gear: P.gear, bag: P.bag, cch: W.caches.filter(c => c.gone).map(c => c.id), mats: P.mats, own: P.owned, perm: P.perm })); } catch (e) { /* storage unavailable */ }
 }
 
 // ---------------------------------------------------------------- HUD
@@ -121,7 +121,7 @@ function loadWorld() {
   }
   W.horse = M.makeHorse(); W.horse.x = B.start.x - 2.2; W.horse.y = B.start.y + 1.2; W.horse.face = 0.4; W.horse.call = false; W.horse.gait = 0; R.root.add(W.horse.g);
   W.npcs = B.npcs.map(n => { const g = M.makeNPC(n.hue); place(g, n.x, n.y); R.root.add(g); return { ...n, g, ph: rnd(6) }; });
-  W.drops = []; W.firstDrop = false; P.gear = { robe: null, ring: null, charm: null }; P.bag = []; P.st = null; W.fire = null; W.said = {}; W.fireballs = []; W.burns = []; W.bolts = []; W.skybolts = []; spawnElixirs(); spawnCaches(); spawnWild();
+  W.drops = []; W.firstDrop = false; W.arrows = []; W.fires = new Map(); W.burnt = new Set(); W.fireDirty = false; P.mats = { dust: 0, ess: 0 }; P.owned = {}; P.perm = { ink: 0 }; P.gear = { robe: null, ring: null, charm: null }; P.bag = []; P.st = null; W.fire = null; W.said = {}; W.fireballs = []; W.burns = []; W.bolts = []; W.skybolts = []; spawnElixirs(); spawnCaches(); spawnWild();
   if (!P.m) P.m = M.makeHero();
   R.root.add(P.m.g); P.m.g.visible = true; tintRobe();
   P.lvl = 1; P.xp = 0; applyLevel(); P.ink = P.maxInk; setWeapon(0);
@@ -145,11 +145,12 @@ function applySave(sv) {
   R.touchTerrain();
   Object.assign(P, { x: sv.cp[0], y: sv.cp[1], cx: sv.cp[0], cy: sv.cp[1] });
   S.camX = P.x; S.camY = P.y; S.runT = sv.t || 0; S.deaths = sv.d || 0;
+  P.mats = Object.assign({ dust: 0, ess: 0 }, sv.mats); P.owned = sv.own || {}; P.perm = Object.assign({ ink: 0 }, sv.perm);
   if (sv.gear) { P.gear = Object.assign({ robe: null, ring: null, charm: null }, sv.gear); P.bag = sv.bag || []; P.st = null; tintRobe(); }
   P.lvl = sv.lvl || 1; P.xp = sv.xp || 0; applyLevel(); P.hp = P.maxHp; P.ink = P.maxInk; hudHearts();
   for (const e of W.elixirs) if ((sv.elx || []).includes(e.id)) e.gone = true;
   for (const c of W.caches) if ((sv.cch || []).includes(c.id)) c.gone = true;
-  setWeapon(WEAPONS[sv.wp || 0].lvl <= P.lvl ? sv.wp || 0 : 0);
+  setWeapon(canUse(WEAPONS[sv.wp || 0]) ? sv.wp || 0 : 0);
 }
 function openGate(g, instant = false) {
   if (g.open) return; g.open = true;
@@ -222,7 +223,7 @@ function interactTarget() {
   if (P.up) return { kind: 'down', x: P.up.x, y: P.up.y, h: P.up.top + 3.2, text: 'climb down' };
   let best = null, bd = 1e9;
   for (const t of W.B.towers) { const d = dist(P.x, P.y, t.x, t.y) - t.base; if (d < 1.9 && d < bd) { bd = d; best = { kind: 'tower', ref: t, x: t.x, y: t.y, h: 1.6, text: 'climb' }; } }
-  for (const n of W.npcs) { const d = dist(P.x, P.y, n.x, n.y) - 0.5; if (d < 2.4 && d < bd) { bd = d; best = { kind: 'npc', ref: n, x: n.x, y: n.y, h: 3.3, text: 'talk' }; } }
+  for (const n of W.npcs) { const d = dist(P.x, P.y, n.x, n.y) - 0.5; if (d < 2.4 && d < bd) { bd = d; best = { kind: 'npc', ref: n, x: n.x, y: n.y, h: 3.3, text: n.shop ? 'craft' : 'talk' }; } }
   for (const c of W.caches) { if (c.gone) continue; const d = dist(P.x, P.y, c.x, c.y) - 0.4; if (d < 1.4 && d < bd) { bd = d; best = { kind: 'cache', ref: c, x: c.x, y: c.y, h: 1.9, text: c.kind === 'buried' ? 'dig' : 'open' }; } }
   return best;
 }
@@ -239,6 +240,7 @@ function interact() {
     P.zoomBack = S.zoomTo; S.zoomTo = Math.min(S.zoomTo, 0.55); audio.play('free'); pulse(tw.x, tw.y, [1, 0.95, 0.75], 1, 9, 0.8);
     once('tower', 'High ground. Nothing reaches you up here, and thin lights show where things are buried.', 3.8); return;
   }
+  if (t.ref.shop) { dismount(); return toggleShop(t.ref.shop, t.ref); }
   say(t.ref.name + ': "' + t.ref.line + '"', 4.2); audio.play('letter', -5);
 }
 function campfire() {
@@ -271,17 +273,24 @@ const WEAPONS = [
   { name: 'QUILL', dmg: 1, range: 1.8, half: 1.25, dur: 0.22, cd: 0.25, hitAt: 0.28, spin: true, snd: 'slash', lvl: 1 },
   { name: 'BLADE', dmg: 3, range: 2.4, half: 1.5, dur: 0.44, cd: 0.66, hitAt: 0.55, slam: true, snd: 'spin', lvl: 2 },
   { name: 'NIBS', dmg: 0.6, range: 1.45, half: 1.0, dur: 0.11, cd: 0.12, hitAt: 0.3, snd: 'slash', lvl: 4 },
+  // made by smiths, for dust and essence
+  { name: 'SWORD', dmg: 2, range: 2.25, half: 1.3, dur: 0.26, cd: 0.34, hitAt: 0.3, spin: true, snd: 'slash', lvl: 1, craft: true, cost: [30, 0], desc: 'A straight blade. Twice the quill, same three-hit combo.' },
+  { name: 'SABRE', dmg: 1.4, range: 2.05, half: 1.9, dur: 0.15, cd: 0.17, hitAt: 0.3, snd: 'slash', lvl: 1, craft: true, crit: 20, cost: [45, 2], desc: 'Curved and quick. Wide cuts, +20% chance to crit.' },
+  { name: 'PIKE', dmg: 2.4, range: 3.7, half: 0.42, dur: 0.3, cd: 0.44, hitAt: 0.4, snd: 'dash', lvl: 1, craft: true, lunge: 1.7, cost: [45, 2], desc: 'Twice the reach. Runs through everything in a line.' },
+  { name: 'BOW', dmg: 1.8, range: 0, half: 0, dur: 0.2, cd: 0.42, hitAt: 0.5, snd: 'dash', lvl: 1, craft: true, bow: true, lunge: -0.4, cost: [60, 4], desc: 'Arrows fly far and pass through two. Works from tower tops.' },
+  { name: 'HAMMER', dmg: 4.5, range: 2.3, half: 1.4, dur: 0.55, cd: 0.8, hitAt: 0.6, slam: true, quake: 2.7, snd: 'spin', lvl: 1, craft: true, cost: [80, 6], desc: 'Slow. Everything near where it lands is hit.' },
 ];
+const canUse = (w) => w.lvl <= P.lvl && (!w.craft || P.owned[w.name]);
 const SPELLS = { fire: { cost: 20, lvl: 1 }, bolt: { cost: 30, lvl: 3 } };
 const ELX = { xp: { col: [1, 0.85, 0.4] }, ink: { col: [0.4, 0.7, 1] }, hp: { col: [1, 0.35, 0.45] } };
 const xpNeed = (l) => 30 + l * 30;
-function applyLevel() { const st = GS(); P.dmgMul = (1 + 0.2 * (P.lvl - 1)) * (1 + st.dmg / 100); P.maxHp = 5 + Math.floor(P.lvl / 2) + st.hp; P.maxInk = 60 + 10 * (P.lvl - 1) + st.ink; }
+function applyLevel() { const st = GS(); P.dmgMul = (1 + 0.2 * (P.lvl - 1)) * (1 + st.dmg / 100); P.maxHp = 5 + Math.floor(P.lvl / 2) + st.hp; P.maxInk = 60 + 10 * (P.lvl - 1) + st.ink + P.perm.ink * 10; }
 function hudStats() {
   const bar = (v, max, n = 10) => { const k = Math.round(clamp(v / max, 0, 1) * n); return '▮'.repeat(k) + '<i>' + '▯'.repeat(n - k) + '</i>'; };
   $('lv').innerHTML = '<b>LV ' + P.lvl + '</b> ' + bar(P.xp, xpNeed(P.lvl)) + ' <small>' + Math.floor(P.xp) + '/' + xpNeed(P.lvl) + '</small>';
   $('ink').innerHTML = '<b>INK</b> ' + bar(P.ink, P.maxInk) + ' <small>' + Math.floor(P.ink) + '/' + P.maxInk + '</small>';
   const sp = (k, key, label) => P.lvl >= SPELLS[k].lvl ? `<span class="${P.ink >= SPELLS[k].cost ? '' : 'off'}">${key} ${label}</span>` : `<span class="off">${key} LV${SPELLS[k].lvl}</span>`;
-  if (W && W.caches) $('secrets').innerHTML = '<b>SECRETS</b> ' + W.caches.filter(c => c.gone).length + '<i>/' + W.caches.length + '</i>';
+  if (W && W.caches) $('secrets').innerHTML = '<b>SECRETS</b> ' + W.caches.filter(c => c.gone).length + '<i>/' + W.caches.length + '</i> &nbsp;<b>DUST</b> ' + P.mats.dust + ' &nbsp;<b>ESS</b> ' + P.mats.ess;
   $('slots').innerHTML = '<span>Q ' + WEAPONS[P.weapon].name + '</span>' + sp('fire', '1', 'FIRE') + sp('bolt', '2', 'BOLT') + '<span class="bagk">I BAG ' + P.bag.length + '</span>';
 }
 function gainXP(n, raw = false) {
@@ -298,8 +307,8 @@ function gainXP(n, raw = false) {
 function setWeapon(i) { P.weapon = i; P.m.weapons.forEach((w, k) => { w.g.visible = k === i; }); hudStats(); }
 function nextWeapon() {
   if (S.mode !== 'play') return; let i = P.weapon;
-  do { i = (i + 1) % WEAPONS.length; } while (WEAPONS[i].lvl > P.lvl);
-  if (i !== P.weapon) { setWeapon(i); audio.play('dash'); floatText(P.x, P.y, 3.4 + P.h, WEAPONS[i].name, 'gain'); } else once('wpn', 'More weapons come with levels. Drink elixirs.', 2.6);
+  do { i = (i + 1) % WEAPONS.length; } while (!canUse(WEAPONS[i]));
+  if (i !== P.weapon) { setWeapon(i); audio.play('dash'); floatText(P.x, P.y, 3.4 + P.h, WEAPONS[i].name, 'gain'); } else once('wpn', 'More weapons come with levels, and smiths in the towns make five others.', 3.2);
 }
 function aimAngle() {
   if (S.t - input.mouseT < 2.5 && !document.body.classList.contains('touch')) {
@@ -327,7 +336,7 @@ function explode(f) {
   removeObj(f.g); const r = 2.5;
   W.burns.push({ x: f.x, y: f.y, r, t: 0, life: 3.6, tick: 0 }); if (W.burns.length > 4) W.burns.shift();
   pulse(f.x, f.y, [1, 0.6, 0.2], 1.6, 9, 0.5, 0.3); glow(f.x, f.y, 8, 1.8, [1, 0.55, 0.2], 0.5); burst(f.x, f.y, 0.6, 18, 0xffb050, 7); burst(f.x, f.y, 0.6, 8, 0xffe9a8, 5);
-  S.shake = Math.max(S.shake, 0.4); audio.play('slam');
+  S.shake = Math.max(S.shake, 0.4); audio.play('slam'); igniteCircle(f.x, f.y, r);
   for (const e of W.enemies) if (!e.dead && dist(e.x, e.y, f.x, f.y) < r + e.r) { const [dm, cr] = roll(2, 'fire'); hitEnemy(e, dm, Math.atan2(e.y - f.y, e.x - f.x), false, cr); }
 }
 function freeBolt(t) {
@@ -349,7 +358,7 @@ function castBolt() {
   if (!hit.length) pts.push([P.x + Math.cos(a) * 6, P.y + Math.sin(a) * 6]);
   W.bolts.push({ pts, t: 0 }); if (W.bolts.length > 2) W.bolts.shift();
   hit.forEach((e, i) => { const [dm, cr] = roll(2.5 * Math.pow(0.8, i), 'bolt'); hitEnemy(e, dm, Math.atan2(e.y - P.y, e.x - P.x), false, cr); });
-  for (let i = 1; i < pts.length; i++) { const g = M.makeSkyBolt(); place(g, pts[i][0], pts[i][1]); R.root.add(g); W.skybolts.push({ g, t: 0 }); glow(pts[i][0], pts[i][1], 6, 2.0, [0.7, 0.9, 1], 0.3); burst(pts[i][0], pts[i][1], 0.8, 8, 0xc8f0ff, 7); }
+  for (let i = 1; i < pts.length; i++) { igniteCircle(pts[i][0], pts[i][1], 1); const g = M.makeSkyBolt(); place(g, pts[i][0], pts[i][1]); R.root.add(g); W.skybolts.push({ g, t: 0 }); glow(pts[i][0], pts[i][1], 6, 2.0, [0.7, 0.9, 1], 0.3); burst(pts[i][0], pts[i][1], 0.8, 8, 0xc8f0ff, 7); }
   S.shake = Math.max(S.shake, 0.5); audio.play('zap'); P.atkCd = Math.max(P.atkCd, 0.25);
 }
 // ---------------------------------------------------------------- loot: things the unwriters drop, in four colours of rarity
@@ -407,9 +416,9 @@ function gearStats() {
 }
 const GS = () => P.st || (P.st = gearStats());
 // a hit's damage after the gear has had its say; crits double
-function roll(base, kind) {
+function roll(base, kind, bonus = 0) {
   const st = GS(); let d = base * P.dmgMul * (kind === 'fire' ? 1 + st.fire / 100 : kind === 'bolt' ? 1 + st.bolt / 100 : 1);
-  const crit = Math.random() * 100 < st.crit; if (crit) d *= 2;
+  const crit = Math.random() * 100 < st.crit + bonus; if (crit) d *= 2;
   return [d, crit];
 }
 function tintRobe() {
@@ -423,7 +432,7 @@ function equip(it) {
 }
 function salvage(it) {
   P.bag = P.bag.filter(b => b !== it); const n = RARITY[it.rar].salv;
-  floatText(P.x, P.y, 3.2 + P.h, '+' + n + ' XP', 'gain'); gainXP(n, true); audio.play('type'); save();
+  gainMats(...SALV_MATS[it.rar]); floatText(P.x, P.y, 3.2 + P.h, '+' + SALV_MATS[it.rar][0] + ' dust' + (SALV_MATS[it.rar][1] ? '  +' + SALV_MATS[it.rar][1] + ' essence' : ''), 'mat'); gainXP(n, true); audio.play('type'); save();
 }
 // what falls out of an unwriter: often nothing, sometimes a colour you have never seen
 function maybeDrop(e) {
@@ -514,6 +523,114 @@ function bindBag() {
   $('bagBtn').addEventListener('click', () => toggleBag());
 }
 
+// ---------------------------------------------------------------- materials, makers and what they make
+const KILL_MATS = { blot: [1, 0], scratch: [1, 0], brute: [4, 0], typo: [1, 0], asterisk: [1, 0], ghost: [2, 0], redactor: [8, 1], mimic: [6, 1] };
+const SALV_MATS = [[4, 0], [10, 0], [25, 1], [60, 5]];
+function gainMats(d, e = 0, x, y) {
+  P.mats.dust += d; P.mats.ess += e;
+  if (x !== undefined && (d >= 4 || e)) floatText(x, y, 2.9, '+' + d + ' dust' + (e ? '  +' + e + ' essence' : ''), 'mat');
+}
+function craftItem(rar, slot) { const it = makeItem(rar, 2 + P.lvl + Math.max(0, S.land) * 2, slot); P.bag.push(it); return 'Made: ' + it.name + '. It is in your bag.'; }
+function reforge(slot) {
+  const old = P.gear[slot], it = makeItem(old.rar, old.il, slot); if (old.fx) { it.fx = old.fx; it.name = old.name; }
+  P.gear[slot] = it; P.st = null; applyLevel(); P.hp = Math.min(P.hp, P.maxHp); P.ink = Math.min(P.ink, P.maxInk); tintRobe(); hudHearts();
+  return 'Reforged: ' + it.name + ' now has ' + Object.entries(it.aff).map(([k, v]) => AFX[k].t(v)).join(', ') + '.';
+}
+const SHOPS = {
+  smith: { title: 'SMITH', list: () => WEAPONS.filter(w => w.craft).map(w => ({ name: w.name, desc: w.desc, cost: w.cost, done: P.owned[w.name] ? 'OWNED' : '', make: () => { P.owned[w.name] = 1; setWeapon(WEAPONS.indexOf(w)); return w.name + ' is yours. Q switches weapons.'; } })) },
+  tailor: { title: 'OUTFITTER', list: () => [
+    { name: 'Magic item', desc: 'Blue. A robe, ring or charm, whichever comes out.', cost: [15, 0], bag: 1, make: () => craftItem(1) },
+    ...SLOTS.map(s => ({ name: 'Rare ' + s, desc: 'Gold, three stats.', cost: [50, 2], bag: 1, make: () => craftItem(2, s) })),
+    { name: 'Legendary item', desc: 'Orange. One of the six, with its own power.', cost: [150, 12], bag: 1, make: () => craftItem(3) },
+    ...SLOTS.filter(s => P.gear[s]).map(s => ({ name: 'Reforge: ' + P.gear[s].name, desc: 'Roll the stats of what you wear again. Colour and power stay.', cost: [20, 1], make: () => reforge(s) })),
+  ] },
+  alchemist: { title: 'ALCHEMIST', list: () => [
+    { name: 'Mending draught', desc: 'All your hearts back.', cost: [5, 0], done: P.hp >= P.maxHp ? 'FULL' : '', make: () => { P.hp = P.maxHp; hudHearts(); return 'Mended.'; } },
+    { name: 'Draught of study', desc: '+40 experience.', cost: [20, 0], make: () => { gainXP(40, true); return 'You know a little more.'; } },
+    { name: 'Deep ink', desc: '+10 max ink, for good. ' + P.perm.ink + ' of 5 drunk.', cost: [40, 3], done: P.perm.ink >= 5 ? 'MAX' : '', make: () => { P.perm.ink++; applyLevel(); P.ink = P.maxInk; return 'Your well runs deeper.'; } },
+  ] },
+};
+function renderShop() {
+  const sh = SHOPS[S.shop.kind], list = sh.list(); S.shop.list = list;
+  $('shopTitle').textContent = S.shop.who + ' · ' + sh.title;
+  $('shopLine').textContent = S.shop.msg || '"' + S.shop.line + '"';
+  $('shopMats').innerHTML = `<span>DUST <b>${P.mats.dust}</b></span><span>ESSENCE <b>${P.mats.ess}</b></span><small>Dust comes from kills and from salvaging what you do not wear. Essence comes from gold and orange things, Redactors, Mimics and buried caches.</small>`;
+  $('shopList').innerHTML = list.map((r, i) => {
+    const full = r.bag && P.bag.length >= BAG_MAX, poor = P.mats.dust < r.cost[0] || P.mats.ess < r.cost[1], off = r.done || full || poor;
+    return `<div class="rec${off ? ' off' : ''}"><div><b>${r.name}</b><small>${r.desc}</small></div><i>${r.cost[0]} dust${r.cost[1] ? ' + ' + r.cost[1] + ' essence' : ''}</i><button type="button" data-i="${i}" ${off ? 'disabled' : ''}>${r.done || (full ? 'BAG FULL' : poor ? 'NOT ENOUGH' : 'MAKE')}</button></div>`;
+  }).join('');
+}
+function toggleShop(kind, who) {
+  const on = !!kind; $('shop').classList.toggle('on', on); S.paused = on; last = performance.now(); keys.clear(); input.held = false; input.sx = input.sy = 0;
+  if (on) { S.shop = { kind, who: who.name, line: who.line, msg: '' }; renderShop(); audio.play('letter', -5); } else { S.shop = null; hudStats(); }
+}
+function bindShop() {
+  $('shopList').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || b.disabled) return; const r = S.shop.list[+b.dataset.i];
+    if (P.mats.dust < r.cost[0] || P.mats.ess < r.cost[1]) return;
+    P.mats.dust -= r.cost[0]; P.mats.ess -= r.cost[1]; S.shop.msg = r.make(); audio.play('word'); save(); renderShop();
+  });
+  $('shopClose').addEventListener('click', () => toggleShop(null));
+}
+// ---- arrows
+function shootArrow(a) {
+  const g = M.makeArrow(); R.root.add(g);
+  W.arrows.push({ x: P.x + Math.cos(a) * 0.8, y: P.y + Math.sin(a) * 0.8, h: 1.3 + P.h, vx: Math.cos(a) * 24, vy: Math.sin(a) * 24, life: 0.8, g, hit: [], a });
+}
+function updateArrows(dt) {
+  for (const s of W.arrows) {
+    s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; s.h += (1.1 - s.h) * Math.min(1, dt * 4); place(s.g, s.x, s.y, s.h); s.g.rotation.y = rotY(s.a);
+    for (const e of W.enemies) if (!e.dead && !s.hit.includes(e) && dist(e.x, e.y, s.x, s.y) < e.r + 0.4) { s.hit.push(e); const [dm, cr] = roll(WEAPONS[6].dmg); hitEnemy(e, dm, s.a, false, cr); }
+    if (s.life <= 0 || s.hit.length >= 2 || (s.h < 2 && W.T.isSolid(s.x, s.y))) { s.dead = true; removeObj(s.g); }
+  }
+  W.arrows = W.arrows.filter(s => !s.dead);
+}
+// ---- fire in the wheat: crops catch, pass it on to the crop next to them, and are ash a second later
+const FB = 4, fkey = (bx, by) => bx + by * 4096;
+function igniteAt(x, y) {
+  const T = W.T, bx = Math.floor(x * 8 / FB), by = Math.floor(y * 8 / FB), key = fkey(bx, by);
+  if (bx < 0 || by < 0 || W.fires.has(key) || W.burnt.has(key)) return false;
+  let crop = false;
+  for (let cy = by * FB; cy < by * FB + FB && !crop; cy++) for (let cx = bx * FB; cx < bx * FB + FB; cx++) if (cx < T.w && cy < T.h && (T.data[(cy * T.w + cx) * 4 + 3] & 127) === 8) { crop = true; break; }
+  if (!crop) return false;
+  W.fires.set(key, { bx, by, t: 0, spread: false }); W.B.scorch(bx * FB, by * FB, FB, 1); W.fireDirty = true; return true;
+}
+function igniteCircle(x, y, r) {
+  let any = false; for (let dy = -r; dy <= r; dy += 0.5) for (let dx = -r; dx <= r; dx += 0.5) if (dx * dx + dy * dy <= r * r) any = igniteAt(x + dx, y + dy) || any;
+  if (any) once('wheat', 'The wheat is burning. Fire runs through a whole field, and through whatever stands in it.', 3.8);
+}
+function updateFire(dt) {
+  if (W.fires.size) {
+    for (const [key, f] of W.fires) {
+      f.t += dt; const cx = (f.bx + 0.5) * FB / 8, cy = (f.by + 0.5) * FB / 8;
+      if (!f.spread && f.t > 0.3) { f.spread = true; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && Math.random() < 0.8) igniteAt(cx + dx * FB / 8, cy + dy * FB / 8); }
+      if (f.t > 1.2) { W.B.scorch(f.bx * FB, f.by * FB, FB, 2); W.fires.delete(key); W.burnt.add(key); W.fireDirty = true; }
+      else if (Math.random() < dt * 1.2) burst(cx, cy, 0.3, 1, Math.random() < 0.5 ? 0xffb050 : 0xff6a3a, 2.4);
+    }
+    W.fireTick = (W.fireTick || 0) - dt;
+    if (W.fireTick <= 0) {
+      W.fireTick = 0.4; const fs = [...W.fires.values()], f = fs[Math.floor(Math.random() * fs.length)];
+      if (f) { glow((f.bx + 0.5) * FB / 8, (f.by + 0.5) * FB / 8, 7, 1.3, [1, 0.5, 0.2], 0.5); if (dist(P.x, P.y, (f.bx + 0.5) * FB / 8, (f.by + 0.5) * FB / 8) < 30) audio.play('fire'); }
+      for (const e of W.enemies) if (!e.dead && e.type !== 'boss' && W.fires.has(fkey(Math.floor(e.x * 8 / FB), Math.floor(e.y * 8 / FB)))) hitEnemy(e, roll(0.7, 'fire')[0], rnd(6.28), true);
+    }
+  }
+  W.fireUp = (W.fireUp || 0) - dt; if (W.fireDirty && W.fireUp <= 0) { R.touchTerrain(); W.fireDirty = false; W.fireUp = 0.1; }
+}
+// ---- sound settings
+const AUD = 'unwritten.audio';
+function saveAudio() { try { localStorage.setItem(AUD, JSON.stringify({ m: audio.musVol, s: audio.sfxVol, tr: audio.track })); } catch (e) { /* storage unavailable */ } }
+function showTrack() { $('trName').textContent = TRACKS[audio.track].name; }
+function nextTrack(d = 1) { const n = audio.setTrack(audio.track + d); showTrack(); saveAudio(); if (S.mode === 'play' && !S.paused) floatText(P.x, P.y, 3.6 + P.h, '♪ ' + n, 'ink'); }
+function bindAudio() {
+  try { const a = JSON.parse(localStorage.getItem(AUD) || 'null'); if (a) { audio.musVol = a.m ?? 0.7; audio.sfxVol = a.s ?? 0.7; audio.track = a.tr || 0; } } catch (e) { /* defaults */ }
+  $('volM').value = Math.round(audio.musVol * 100); $('volS').value = Math.round(audio.sfxVol * 100); showTrack();
+  $('volM').addEventListener('input', (e) => { audio.start(); audio.setMusicVol(e.target.value / 100); saveAudio(); });
+  $('volS').addEventListener('input', (e) => { audio.start(); audio.setSfxVol(e.target.value / 100); saveAudio(); });
+  $('volS').addEventListener('change', () => audio.play('letter'));
+  $('trPrev').addEventListener('click', () => nextTrack(-1)); $('trNext').addEventListener('click', () => nextTrack(1));
+  $('audBtn').addEventListener('click', togglePause);
+}
+
 // ---------------------------------------------------------------- the wilds: hidden caches and what lives between the roads
 const NAMES = { typo: 'Typo', asterisk: 'Asterisk', ghost: 'Ghostwriter', redactor: 'Redactor', mimic: 'Mimic' };
 const HEAVY = { brute: 1, redactor: 1, mimic: 1 };
@@ -547,7 +664,7 @@ function openCache(c) {
   if (c.mimic) { const e = spawnEnemy('mimic', c.x, c.y); e.grow = 1; e.state = 'chase'; e.cd = 0.4; audio.play('warn'); S.shake = Math.max(S.shake, 0.4); say('That was never a chest.', 2.2); save(); return; }
   audio.play('free'); const il = 3 + c.land * 2 + P.lvl, n = c.kind === 'buried' ? 2 : Math.random() < 0.4 ? 2 : 1;
   for (let k = 0; k < n; k++) { const q = Math.random(); dropItem(c.x, c.y, c.kind === 'buried' ? (q < 0.12 ? 3 : q < 0.6 ? 2 : 1) : (q < 0.05 ? 3 : q < 0.35 ? 2 : 1), il); }
-  gainXP(15); const found = W.caches.filter(x => x.gone).length;
+  gainXP(15); gainMats(8, c.kind === 'buried' ? 1 : 0, c.x, c.y); const found = W.caches.filter(x => x.gone).length;
   floatText(c.x, c.y, 3, 'SECRET ' + found + '/' + W.caches.length, 'gain'); hudStats(); save();
 }
 function updateCaches(dt) {
@@ -681,11 +798,12 @@ function startAttack(mx, my, moving) {
   P.face = a; P.combo = P.comboT > 0 ? (P.combo % 3) + 1 : 1; if (!wp.spin && P.combo === 3) P.combo = 1;
   const spin = P.combo === 3;
   P.atkDur = P.atkT = spin ? 0.34 : wp.dur; P.atkCd = spin ? 0.46 : wp.cd; P.comboT = P.atkCd + 0.42; P.hitDone = false;
-  P.kx += Math.cos(a) * (spin ? 2 : 3.4); P.ky += Math.sin(a) * (spin ? 2 : 3.4);
+  if (!P.up) { const lg = (spin ? 2 : 3.4) * (wp.lunge ?? 1); P.kx += Math.cos(a) * lg; P.ky += Math.sin(a) * lg; }
   audio.play(spin ? 'spin' : wp.snd, P.combo);
 }
 function doHit() {
   const wp = WEAPONS[P.weapon], spin = P.combo === 3, range = spin ? 2.15 : wp.range, half = spin ? 4 : wp.half, base = spin ? 2 : wp.dmg, st = GS(); let landed = null;
+  if (wp.bow && !spin) { shootArrow(P.face); return; }
   if (wp.slam) { const hx = P.x + Math.cos(P.face) * 1.5, hy = P.y + Math.sin(P.face) * 1.5; pulse(hx, hy, [1, 0.85, 0.5], 1.5, 8, 0.45, 0.3); glow(hx, hy, 5, 1.5, [1, 0.85, 0.5], 0.3); burst(hx, hy, 0.3, 10, 0xffd98a, 6); S.shake = Math.max(S.shake, 0.45); audio.play('slam'); }
   if (spin) pulse(P.x, P.y, [1, 0.95, 0.8], 0.9, 9, 0.28, 0.4);
   glow(P.x + Math.cos(P.face), P.y + Math.sin(P.face), 2.8, 0.7, [1, 0.8, 0.9], 0.14);
@@ -693,7 +811,8 @@ function doHit() {
   for (const e of W.enemies) {
     if (e.dead) continue;
     const d = dist(P.x, P.y, e.x, e.y), a = Math.atan2(e.y - P.y, e.x - P.x);
-    if (d <= range + e.r && (d < 0.9 + e.r || Math.abs(angDiff(a, P.face)) <= half)) { const [dm, cr] = roll(base); hitEnemy(e, dm, a, false, cr); landed = landed || e; if (st.leech) P.ink = Math.min(P.maxInk, P.ink + st.leech); }
+    const q = wp.quake && !spin ? dist(P.x + Math.cos(P.face) * 1.5, P.y + Math.sin(P.face) * 1.5, e.x, e.y) <= wp.quake + e.r : d <= range + e.r && (d < 0.9 + e.r || Math.abs(angDiff(a, P.face)) <= half);
+    if (q) { const [dm, cr] = roll(base, null, wp.crit || 0); hitEnemy(e, dm, a, false, cr); landed = landed || e; if (st.leech) P.ink = Math.min(P.maxInk, P.ink + st.leech); }
   }
   if (landed && st.fx.chain && ++P.hits % 4 === 0) freeBolt(landed);
   for (const s of W.shots) {
@@ -722,7 +841,7 @@ function updatePlayer(dt) {
   if (input.s2) { input.s2 = false; castBolt(); }
   if (input.ride) { input.ride = false; ride(); }
   if (input.fire) { input.fire = false; campfire(); }
-  if (p.up) { input.attack = input.held = input.dash = false; }
+  if (p.up) { input.dash = false; if (!WEAPONS[p.weapon].bow) input.attack = input.held = false; }
   if (p.mounted) { input.dash = false; if (input.attack || input.held) dismount(); }
   if (input.dash) {
     input.dash = false;
@@ -731,7 +850,7 @@ function updatePlayer(dt) {
       p.dx = Math.cos(a); p.dy = Math.sin(a); p.dashT = 0.17; p.dashCd = 0.62; p.inv = Math.max(p.inv, 0.27); p.atkT = 0;
       if (moving) p.face = a;
       audio.play('dash'); pulse(p.x, p.y, [0.7, 0.75, 1], 0.5, 6, 0.3); p.cut = [];
-      if (GS().fx.trail) { W.burns.push({ x: p.x, y: p.y, r: 1.6, t: 0, life: 2.6, tick: 0 }); if (W.burns.length > 4) W.burns.shift(); }
+      if (GS().fx.trail) { igniteCircle(p.x, p.y, 1.2); W.burns.push({ x: p.x, y: p.y, r: 1.6, t: 0, life: 2.6, tick: 0 }); if (W.burns.length > 4) W.burns.shift(); }
     }
   }
   if ((input.attack || input.held) && p.atkCd <= 0 && p.dashT <= 0) startAttack(mx, my, moving);
@@ -846,7 +965,7 @@ function hitEnemy(e, dmg, a, soft = false, crit = false) {
 function killEnemy(e) {
   e.dead = true;
   if (e.type === 'boss') return bossDead(e);
-  gainXP({ blot: 6, scratch: 8, brute: 20, typo: 3, asterisk: 8, ghost: 14, redactor: 45, mimic: 40 }[e.type] || 5); maybeDrop(e);
+  gainXP({ blot: 6, scratch: 8, brute: 20, typo: 3, asterisk: 8, ghost: 14, redactor: 45, mimic: 40 }[e.type] || 5); maybeDrop(e); gainMats(...(KILL_MATS[e.type] || [1, 0]), e.x, e.y);
   if (GS().fx.pop) { pulse(e.x, e.y, [1, 0.55, 0.15], 1.2, 9, 0.4); for (const o of W.enemies) if (!o.dead && o !== e && dist(o.x, o.y, e.x, e.y) < 2.4 + o.r) after(0.08, () => hitEnemy(o, ...roll(1.5), Math.atan2(o.y - e.y, o.x - e.x))); }
   removeObj(e.o.g); audio.play('kill'); glow(e.x, e.y, 4, 1.2, [0.75, 0.55, 1], 0.45);
   burst(e.x, e.y, 0.8, HEAVY[e.type] ? 22 : 12, 0xc9a8ff, 6); pulse(e.x, e.y, [0.8, 0.7, 1], 1, 7, 0.5);
@@ -1027,7 +1146,7 @@ function updateBossHazards(dt) {
   W.lines = W.lines.filter(l => l.t < l.tele + 0.24);
 }
 function bossDead(e) {
-  gainXP(120); after(1.2, () => { dropItem(e.x, e.y, 3, 14 + P.lvl); dropItem(e.x, e.y, 2, 12 + P.lvl); });
+  gainXP(120); gainMats(40, 5, e.x, e.y); after(1.2, () => { dropItem(e.x, e.y, 3, 14 + P.lvl); dropItem(e.x, e.y, 2, 12 + P.lvl); });
   W.bossState = 'dying'; W.lines = []; W.slams = []; audio.play('bossdie'); audio.intense = false; S.hitstop = 0.25;
   for (const m of W.enemies) if (m !== e && !m.dead && (m.minion || dist(m.x, m.y, e.x, e.y) < 12)) { m.dead = true; removeObj(m.o.g); burst(m.x, m.y, 0.8, 10, 0xc9a8ff, 6); }
   for (const s of W.shots) removeObj(s.g); W.shots = [];
@@ -1283,7 +1402,7 @@ function updateOverlay() {
   for (const n of W.npcs) {
     const on = near && dist(P.x, P.y, n.x, n.y) < 9;
     if (!on) { if (n.lab) n.lab.style.display = 'none'; continue; }
-    if (!n.lab) { n.lab = document.createElement('div'); n.lab.className = 'lab npc'; n.lab.textContent = n.name; $('fx').appendChild(n.lab); }
+    if (!n.lab) { n.lab = document.createElement('div'); n.lab.className = 'lab npc' + (n.shop ? ' maker' : ''); n.lab.textContent = n.name; $('fx').appendChild(n.lab); }
     const [x, y] = R.toScreen(n.x, n.y, 2.8); n.lab.style.display = 'block'; n.lab.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
   }
   const you = $('you2'), [hx, hy] = R.toScreen(P.x, P.y, 3.1 + P.h + (P.mounted ? 0.8 : 0));
@@ -1324,7 +1443,7 @@ function step(dt) {
     for (const e of W.enemies) if (!e.dead) (e.type === 'boss' ? updateBoss : updateEnemy)(e, dt);
     W.enemies = W.enemies.filter(e => !e.dead || e.type === 'boss');
     if (W.bossState === 'fight') updateBossHazards(dt);
-    updateLoot(dt); updateCaches(dt);
+    updateLoot(dt); updateCaches(dt); updateArrows(dt); updateFire(dt);
   }
   updateWorld(dt); updateMsg(dt);
 }
@@ -1366,8 +1485,10 @@ function zoomBy(f) { S.zoomTo = clamp(S.zoomTo * f, S.zMin, 2.2); }
 function bind() {
   addEventListener('keydown', (e) => {
     if (e.repeat) return;
+    if ($('shop').classList.contains('on')) { if (e.code === 'Escape' || e.code === 'KeyE') toggleShop(null); return; }
     if (e.code === 'KeyI' || e.code === 'Tab' || e.code === 'KeyB') { e.preventDefault(); return toggleBag(); }
     if ($('bag').classList.contains('on')) { if (e.code === 'Escape') toggleBag(false); return; }
+    if (e.code === 'KeyN') nextTrack();
     keys.add(e.code); audio.start();
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     if (S.mode === 'title' && (e.code === 'Enter' || e.code === 'Space')) return startGame(!!readSave());
@@ -1412,7 +1533,7 @@ function bind() {
   btn('bA', () => { input.attack = true; input.held = true; }, () => { input.held = false; });
   btn('bD', () => { input.dash = true; });
   btn('bU', () => { input.use = true; }); btn('bR', () => { input.ride = true; }); btn('bF', () => { input.fire = true; }); btn('bW', () => { input.swap = true; }); btn('b1', () => { input.s1 = true; }); btn('b2', () => { input.s2 = true; });
-  bindBag();
+  bindBag(); bindShop(); bindAudio();
   $('start').addEventListener('click', () => startGame(false));
   $('cont').addEventListener('click', () => startGame(true));
   $('snd').addEventListener('click', toggleSound);
@@ -1428,6 +1549,7 @@ function toggleSound() { audio.start(); $('snd').textContent = audio.toggle() ? 
 function togglePause() {
   if (S.mode === 'title' || S.mode === 'end') return;
   if ($('bag').classList.contains('on')) return toggleBag(false);
+  if ($('shop').classList.contains('on')) return toggleShop(null);
   S.paused = !S.paused; $('pause').classList.toggle('on', S.paused); last = performance.now();
   if (audio.ctx) S.paused ? audio.ctx.suspend() : audio.ctx.resume();
 }
@@ -1438,7 +1560,7 @@ function startGame(cont) {
   const sv = cont && readSave();
   if (sv) { applySave(sv); S.land = -1; enterLand(W.T.regAt(P.x, P.y)); }
   else { clearSave(); S.land = -1; enterLand(0); after(8.5, () => say('No walls out here. Go anywhere. R calls your horse, Z shows the whole world.', 4)); }
-  $('hint').textContent = 'CLICK STRIKE \u00b7 Q WEAPON \u00b7 1 FIRE \u00b7 2 BOLT \u00b7 SHIFT DASH \u00b7 R HORSE \u00b7 E USE \u00b7 F CAMP \u00b7 I BAG';
+  $('hint').textContent = 'CLICK STRIKE \u00b7 Q WEAPON \u00b7 1 FIRE \u00b7 2 BOLT \u00b7 SHIFT DASH \u00b7 R HORSE \u00b7 E USE \u00b7 F CAMP \u00b7 I BAG \u00b7 N MUSIC';
   setTimeout(() => { $('hint').textContent = ''; }, 30000);
 }
 
@@ -1454,7 +1576,7 @@ async function boot() {
     audio.pending = LANDS[0].music;
     requestAnimationFrame(frame);
     const q = new URLSearchParams(location.search);
-    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire, castFire, castBolt, gainXP, nextWeapon, tick, setWeapon, say, audio, dropItem, makeItem, equip, toggleBag, RARITY, openCache };
+    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire, castFire, castBolt, gainXP, nextWeapon, tick, setWeapon, say, audio, dropItem, makeItem, equip, toggleBag, RARITY, openCache, toggleShop, gainMats, WEAPONS, igniteCircle, nextTrack };
   } catch (err) {
     console.error(err); $('err').style.display = 'flex'; $('title').classList.remove('on');
   }

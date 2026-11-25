@@ -1,15 +1,25 @@
 // UNWRITTEN — all sound is synthesised: no audio files.
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
+// LAND follows whichever land you stand in; the rest play wherever you are
+export const TRACKS = [
+  { name: 'LAND' },
+  { name: 'WALTZ', root: 48, scale: [0, 3, 7, 8, 10], tempo: 0.3, style: 'waltz' },
+  { name: 'MARCH', root: 50, scale: [0, 2, 3, 5, 7, 10], tempo: 0.21, style: 'march' },
+  { name: 'BELLS', root: 60, scale: [0, 2, 4, 7, 9], tempo: 0.5, style: 'bells' },
+  { name: 'DRIFT', root: 45, scale: [0, 3, 5, 7, 10], tempo: 0.85, style: 'drift' },
+];
+const WALTZ = [[0, 3, 7], [8, 12, 15], [3, 7, 10], [10, 14, 17], [0, 3, 7], [5, 8, 12], [8, 12, 15], [7, 11, 14]];
+
 export class Audio {
-  constructor() { this.ctx = null; this.muted = false; this.music = null; this.timer = null; }
+  constructor() { this.ctx = null; this.muted = false; this.music = null; this.timer = null; this.musVol = 0.7; this.sfxVol = 0.7; this.track = 0; this.landM = null; }
   start() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     const c = this.ctx = new AC();
     this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.8; this.master.connect(c.destination);
-    this.sfx = c.createGain(); this.sfx.gain.value = 0.5; this.sfx.connect(this.master);
-    this.mus = c.createGain(); this.mus.gain.value = 0.34;
+    this.sfx = c.createGain(); this.sfx.gain.value = this.sfxVol * 0.72; this.sfx.connect(this.master);
+    this.mus = c.createGain(); this.mus.gain.value = this.musVol * 0.5;
     const d = c.createDelay(1.5), fb = c.createGain(), lp = c.createBiquadFilter();
     d.delayTime.value = 0.43; fb.gain.value = 0.42; lp.type = 'lowpass'; lp.frequency.value = 1800;
     this.mus.connect(this.master); this.mus.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); lp.connect(this.master);
@@ -70,14 +80,19 @@ export class Audio {
   }
 
   // generative score: a slow pad and a plucked line in the chapter's scale
-  setMusic(m) {
-    this.pending = m; if (!this.ctx) return;
+  setMusicVol(v) { this.musVol = Math.max(0, Math.min(1, v)); if (this.mus) this.mus.gain.value = this.musVol * 0.5; }
+  setSfxVol(v) { this.sfxVol = Math.max(0, Math.min(1, v)); if (this.sfx) this.sfx.gain.value = this.sfxVol * 0.72; }
+  setTrack(i) { this.track = ((i % TRACKS.length) + TRACKS.length) % TRACKS.length; if (this.ctx) this.playScore(this.track ? TRACKS[this.track] : this.landM); return TRACKS[this.track].name; }
+  // the land's own score; it only sounds while the LAND track is chosen
+  setMusic(m) { this.landM = m; this.pending = m; if (this.ctx && (this.track === 0 || !m)) this.playScore(m); else if (this.ctx && !this.timer) this.playScore(TRACKS[this.track]); }
+  playScore(m) {
+    if (!this.ctx) return;
     if (this.timer) clearInterval(this.timer);
     if (this.pad) { const p = this.pad, t = this.ctx.currentTime; p.g.gain.linearRampToValueAtTime(0.0001, t + 1.5); p.o.forEach(o => o.stop(t + 1.6)); this.pad = null; }
     if (!m) return;
     const c = this.ctx, t = c.currentTime;
     const g = c.createGain(), f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520; f.Q.value = 2;
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.11, t + 3);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(m.style === 'waltz' || m.style === 'march' ? 0.045 : m.style === 'drift' ? 0.15 : 0.11, t + 3);
     const o = [0, 7, 12, 19].map((n, i) => { const os = c.createOscillator(); os.type = i % 2 ? 'sawtooth' : 'triangle'; os.frequency.value = mtof(m.root - 12 + n) * (1 + (i - 1.5) * 0.002); os.connect(f); os.start(t); return os; });
     const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 0.07; lg.gain.value = 220; lfo.connect(lg); lg.connect(f.frequency); lfo.start(t); o.push(lfo);
     f.connect(g); g.connect(this.mus); this.pad = { g, o };
@@ -85,6 +100,27 @@ export class Audio {
     this.timer = setInterval(() => {
       if (!this.ctx || this.ctx.state !== 'running') return;
       step++;
+      if (m.style) {
+        const T = (type, n, dur, vol, del = 0) => this.tone(type, mtof(n), mtof(n), dur, vol, del, this.mus), sc = m.scale;
+        if (m.style === 'waltz') {          // six to the bar: a bass note, then a broken chord up and back
+          const bar = (step - 1) % 6, ch = WALTZ[Math.floor((step - 1) / 6) % WALTZ.length], shape = [0, 1, 2, 3, 2, 1][bar], n = m.root + 12 + (shape === 3 ? ch[0] + 12 : ch[shape]);
+          if (bar === 0) T('sine', m.root - 12 + ch[0], 1.6, 0.24); if (bar === 3) T('sine', m.root - 12 + ch[2], 0.8, 0.12);
+          T('triangle', n, 0.9, bar === 0 ? 0.13 : 0.09); T('sawtooth', n + 12, 0.25, 0.018);
+          if ((bar === 0 || bar === 3) && Math.random() < 0.55) T('sine', m.root + 24 + ch[Math.floor(Math.random() * 3)], 1.4, 0.07);
+        } else if (m.style === 'march') {   // four on the floor and a climbing line
+          const b = (step - 1) % 8, sh = [0, 0, -2, 3][Math.floor((step - 1) / 16) % 4], line = [0, 2, 4, 2, 5, 4, 2, 1][b];
+          if (b % 4 === 0) T('square', m.root - 12 + sh + (b === 4 ? 7 : 0), 0.18, 0.07); if (b % 2 === 0) T('sine', m.root - 24 + sh, 0.3, 0.2);
+          T('triangle', m.root + 12 + sh + sc[line % sc.length] + (line >= sc.length ? 12 : 0), 0.32, 0.1);
+          if (b === 7 && Math.random() < 0.5) T('triangle', m.root + 24 + sh + sc[Math.floor(Math.random() * sc.length)], 0.6, 0.07);
+        } else if (m.style === 'bells') {   // slow chimes that ring over each other
+          if (Math.random() < 0.62) { const n = m.root + sc[Math.floor(Math.random() * sc.length)] + 12 * Math.floor(Math.random() * 3); T('sine', n, 3.2, 0.12); T('sine', n + 12, 1.2, 0.03); }
+          if (step % 8 === 1) T('sine', m.root - 12, 4, 0.14);
+        } else {                            // drift: mostly the pad, a low note now and then
+          if (Math.random() < 0.4) T('triangle', m.root + sc[Math.floor(Math.random() * sc.length)] + (Math.random() < 0.3 ? 12 : 0), 3.6, 0.1);
+          if (step % 4 === 1) T('sine', m.root - 12, 3.4, 0.16);
+        }
+        return;
+      }
       const dense = this.intense ? 0.75 : 0.42;
       if (Math.random() < dense) {
         let i = last + Math.floor(Math.random() * 5) - 2; i = Math.max(0, Math.min(m.scale.length * 2 - 1, i)); last = i;

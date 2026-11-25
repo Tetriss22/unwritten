@@ -32,6 +32,24 @@ Something is deleting the world one word at a time. You are the last Scribe. The
 - **Elixirs** are scattered over the whole world, about ninety of them: gold gives experience, blue refills ink, red heals. Kills and letters give experience too.
 - Each level adds 20% damage and 10 ink, and every second level adds a point of health. Levels, weapon and collected elixirs are saved.
 
+## Towns, makers and crafting
+
+Five towns stand between the old places: **Wheatham** and **Fordmill** in the Margin, **Stillwater** in the Drowned Shelves, **Emberwick** in Cinder Row and **Coldharbour** in Whiteout Pass. Each has a square with a well, a ring of houses, townsfolk to talk to and makers at stalls (33 people in the world, 10 of them makers).
+
+Makers work for **dust** (from kills and from salvaging gear) and **essence** (from gold and orange gear, Redactors, Mimics, buried caches and the Editor):
+
+- **Smiths** make five weapons: **SWORD** (twice the quill), **SABRE** (fast, wide, +20% crit), **PIKE** (double reach, pierces a line), **BOW** (arrows pass through two and can be shot from tower tops) and **HAMMER** (slow, hits everything near the impact). There is a smith in the first village.
+- **Outfitters** make magic, rare and legendary gear, and reforge the stats of what you wear.
+- **Alchemists** sell a mending draught, a draught of experience and Deep ink (+10 max ink for good, five times).
+
+## Wheat burns
+
+There are many more wheat fields in the Margin. A fireball, a lightning strike or the Cinder Mantle sets wheat alight; the fire runs from stalk to stalk until the whole field is ash, and hurts every unwriter standing in it.
+
+## Music
+
+ESC (or the note button) opens the pause screen with a music volume slider, a sound volume slider and a track switch: LAND (each land's own score), WALTZ, MARCH, BELLS, DRIFT. **N** jumps to the next track. All of it is synthesised; the choice is remembered.
+
 ## The wilds
 
 The world is 237 x 170 units, 1.75 times its first size: each land now covers about as much ground as a third of the old map. Between the roads live five more unwriters:

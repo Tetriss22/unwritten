@@ -94,6 +94,25 @@ export function makeHero() {
   part(nibs, G.cone4, Gl(0xffffff, 'quill'), 0.16, 1.0, 0.06, 0, 0, 0.6).rotation.x = Math.PI / 2;
   const nb2 = part(nibs, G.cone4, Gl(0xa8e0ff, 'quill'), 0.16, 0.9, 0.06, -0.3, 0, 0.5); nb2.rotation.x = Math.PI / 2; nb2.rotation.z = 0.5;
   const weapons = [{ g: quill, tip: tipMark, base: baseMark }, { g: seal, tip: mark(seal, 2.1), base: mark(seal, 1.3) }, { g: nibs, tip: mark(nibs, 1.1), base: mark(nibs, 0.45) }];
+  // five more, made by smiths
+  const held = () => { const w = new THREE.Group(); w.position.copy(quill.position); armR.add(w); return w; };
+  const steel = Gl(0xf2f7ff, 'quill'), woodM = H(0xe0c8a0, 'wood'), up = (m) => { m.rotation.x = Math.PI / 2; return m; };
+  const sword = held();        // a straight blade with a cross guard
+  up(part(sword, G.cyl, woodM, 0.09, 0.44, 0.09, 0, 0, 0)); part(sword, G.sph, gold, 0.16, 0.16, 0.16, 0, 0, -0.25); part(sword, G.box, gold, 0.6, 0.09, 0.1, 0, 0, 0.26);
+  part(sword, G.box, steel, 0.17, 0.05, 1.7, 0, 0, 1.15); up(part(sword, G.cone4, steel, 0.17, 0.32, 0.05, 0, 0, 2.16));
+  const sabre = held();        // curved: three lengths, each leaning a little further
+  up(part(sabre, G.cyl, woodM, 0.09, 0.4, 0.09, 0, 0, 0)); part(sabre, G.tor, gold, 0.34, 0.34, 0.6, 0, -0.08, 0.05).rotation.y = Math.PI / 2;
+  [[0.55, 0.0, 0.0], [1.1, 0.07, -0.13], [1.62, 0.21, -0.27]].forEach(([z, y, r]) => { part(sabre, G.box, steel, 0.05, 0.2, 0.6, 0, y, z).rotation.x = r; });
+  part(sabre, G.cone4, steel, 0.05, 0.3, 0.2, 0, 0.36, 2.0).rotation.x = Math.PI / 2 - 0.5;
+  const pike = held();         // a long shaft and a leaf of steel
+  up(part(pike, G.cyl, woodM, 0.07, 3.2, 0.07, 0, 0, 1.0)); up(part(pike, G.cone4, steel, 0.24, 0.7, 0.08, 0, 0, 2.95)); part(pike, G.box, gold, 0.34, 0.06, 0.08, 0, 0, 2.58);
+  const bow = held();          // held upright: two limbs and a string
+  part(bow, G.box, woodM, 0.08, 1.0, 0.09, 0, 0.46, 0.3).rotation.x = -0.38; part(bow, G.box, woodM, 0.08, 1.0, 0.09, 0, -0.46, 0.3).rotation.x = 0.38;
+  part(bow, G.box, gold, 0.1, 0.3, 0.12, 0, 0, 0.48); part(bow, G.cyl, steel, 0.02, 1.8, 0.02, 0, 0, 0.1);
+  const bowTip = new THREE.Object3D(); bowTip.position.set(0, 0.92, 0.12); bow.add(bowTip); const bowBase = new THREE.Object3D(); bowBase.position.set(0, -0.92, 0.12); bow.add(bowBase);
+  const hammer = held();       // a block of metal on a stick
+  up(part(hammer, G.cyl, woodM, 0.09, 1.9, 0.09, 0, 0, 0.75)); part(hammer, G.box, Gl(0xd8dcf0, 'metal'), 0.95, 0.5, 0.5, 0, 0, 1.75); part(hammer, G.box, gold, 1.0, 0.2, 0.2, 0, 0, 1.75);
+  weapons.push({ g: sword, tip: mark(sword, 2.3), base: mark(sword, 1.2) }, { g: sabre, tip: mark(sabre, 2.1), base: mark(sabre, 1.1) }, { g: pike, tip: mark(pike, 3.3), base: mark(pike, 2.4) }, { g: bow, tip: bowTip, base: bowBase }, { g: hammer, tip: mark(hammer, 2.0), base: mark(hammer, 1.3) });
   const armL = new THREE.Group(); armL.position.set(-0.38, 1.92, 0.02); body.add(armL);
   part(armL, G.cyl, coat, 0.17, 0.62, 0.17, -0.05, -0.26, 0.12).rotation.x = -0.5;
   part(armL, G.sph, skin, 0.15, 0.15, 0.15, -0.07, -0.52, 0.28);
@@ -393,6 +412,16 @@ export function makeProp(p) {
       if (v > 0.8) add(G.box, Gl(0xffe2a0, 'lamp'), 0.18, 0.22, 0.18, 0, 1.02, -0.8);
       g.rotation.y = p.rot; break;
     }
+    case 'stall': {
+      const w = L(0xe8d0a0, 'wood', true), c = L(v < 0.34 ? 0xff6a5a : v < 0.67 ? 0x6fa8ff : 0xffd060, 'roof', true);
+      add(G.box, w, 2.3, 0.12, 0.95, 0, 0.95, 0);
+      for (const [x, z] of [[-1.05, -0.4], [1.05, -0.4], [-1.05, 0.4], [1.05, 0.4]]) add(G.cyl, w, 0.1, 2.2, 0.1, x, 1.1, z);
+      add(G.box, c, 2.7, 0.1, 1.5, 0, 2.25, 0.1).rotation.x = 0.2;
+      if (v < 0.34) { add(G.box, L(0xb8bcd0, 'metal'), 0.6, 0.3, 0.3, -0.5, 1.16, 0); add(G.cone4, Gl(0xf2f7ff, 'quill'), 0.14, 0.9, 0.05, 0.5, 1.06, 0).rotation.z = Math.PI / 2; }
+      else if (v < 0.67) { add(G.cyl, Gl(0x6f9bff, 'cape'), 0.3, 0.34, 0.3, -0.55, 1.18, 0); add(G.tor, Gl(0xffe066, 'gold'), 0.3, 0.3, 1.5, 0.45, 1.06, 0).rotation.x = Math.PI / 2; }
+      else for (const [x, col] of [[-0.6, 0xff5a78], [0, 0x5aa8ff], [0.6, 0xffd060]]) add(G.sph, Gl(col, 'glass'), 0.3, 0.3, 0.3, x, 1.17, 0);
+      g.rotation.y = p.rot; break;
+    }
     case 'well': {
       add(G.cyl, L(0xe0dcf8, 'brick', true), 1.3, 0.7, 1.3, 0, 0.35, 0); add(G.cyl, L(0x5a8aff, 'ice'), 1.0, 0.06, 1.0, 0, 0.7, 0);
       add(G.cyl, L(0xd0b890, 'wood'), 0.12, 1.5, 0.12, -0.6, 0.95, 0); add(G.cyl, L(0xd0b890, 'wood'), 0.12, 1.5, 0.12, 0.6, 0.95, 0);
@@ -487,5 +516,12 @@ export function makeChest() { const g = new THREE.Group(); chestParts(g); return
 export function makeGlint() {
   const g = new THREE.Group(); part(g, G.cyl, Gl(0xfff1c9, 'bolt'), 0.09, 1, 0.09, 0, 0.5, 0);
   part(g, G.ring, Gl(0xfff1c9, 'gold', { side: THREE.DoubleSide }), 0.5, 0.5, 0.5, 0, 0.04, 0).rotation.x = -Math.PI / 2;
+  return noShadow(g);
+}
+
+export function makeArrow() {
+  const g = new THREE.Group(), w = Gl(0xffffff, 'quill');
+  part(g, G.cyl, w, 0.05, 1.1, 0.05, 0, 0, 0).rotation.x = Math.PI / 2; part(g, G.cone4, Gl(0xffe066, 'gold'), 0.16, 0.34, 0.16, 0, 0, 0.68).rotation.x = Math.PI / 2;
+  part(g, G.oct, w, 0.03, 0.22, 0.36, 0, 0, -0.5);
   return noShadow(g);
 }

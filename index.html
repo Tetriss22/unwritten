@@ -156,6 +156,24 @@ body.cap #card, body.cap #msg, body.cap #hint, body.cap #tools, body.cap #arrow,
   #slots { flex-wrap: wrap; font-size: 9px; gap: 3px; }
   #tools { max-width: 40vw; gap: 4px; } #tools button { padding: 6px 7px; font-size: 10px; letter-spacing: .06em; }
 }
+.ft.mat { color: #c9b8ff; font-size: 13px; }
+.lab.npc.maker { color: #05060c; background: #c9b8ff; padding: 1px 6px; text-shadow: none; }
+#shop { background: rgba(5,6,12,.86); align-items: center; justify-content: center; }
+#shop .box { width: min(760px, 96vw); max-height: 92vh; overflow: auto; border: 1px solid #c8c4e0; background: rgba(4,5,10,.96); padding: 16px 18px; text-align: left; }
+#shop h2 { margin: 0 0 8px; font-size: 14px; letter-spacing: .3em; color: #c9b8ff; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+#shopLine { font-size: 12px; color: var(--ink); line-height: 1.6; min-height: 2.4em; }
+#shopMats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 11px; letter-spacing: .14em; color: var(--dim); margin: 8px 0 12px; padding: 8px 10px; border: 1px solid #2a2840; }
+#shopMats b { color: #fff; font-size: 14px; } #shopMats small { flex-basis: 100%; letter-spacing: .02em; line-height: 1.5; font-size: 10px; }
+.rec { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; border: 1px solid #3a3860; padding: 8px 10px; margin-bottom: 5px; }
+.rec b { display: block; font-size: 13px; color: var(--gold); letter-spacing: .04em; } .rec small { display: block; font-size: 10px; color: var(--dim); margin-top: 3px; line-height: 1.5; }
+.rec i { font-style: normal; font-size: 11px; color: #c9b8ff; white-space: nowrap; }
+.rec button { border-color: var(--gold); color: var(--gold); font-size: 11px; padding: 7px 11px; min-width: 104px; }
+.rec.off { opacity: .55; } .rec.off button { border-color: #3a3860; color: var(--dim); cursor: default; }
+.aud { margin-top: 22px; display: grid; gap: 12px; font-size: 11px; letter-spacing: .2em; color: var(--dim); width: min(420px, 86vw); }
+.aud label, .aud .tr { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 12px; text-align: left; }
+.aud input[type=range] { width: 100%; accent-color: #fff1c9; touch-action: auto; height: 22px; }
+.aud .tr div { display: flex; align-items: center; gap: 10px; } .aud .tr span { flex: 1; text-align: center; color: var(--gold); font-weight: 800; letter-spacing: .3em; }
+@media (max-width: 560px) { .rec { grid-template-columns: 1fr auto; } .rec i { grid-column: 1; } #secrets { font-size: 9px; } }
 #err { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 30px; text-align: center; color: var(--pink); line-height: 1.7; }
 </style>
 </head>
@@ -171,7 +189,7 @@ body.cap #card, body.cap #msg, body.cap #hint, body.cap #tools, body.cap #arrow,
   <div id="lanterns" aria-label="lanterns lit"></div>
   <div id="secrets" aria-label="hidden caches found"></div>
   <div id="slots" aria-label="weapon and spells"></div></div>
-  <div id="tools"><button id="zout" type="button" aria-label="zoom out">&minus;</button><button id="zmap" type="button" aria-label="toggle map view">MAP</button><button id="zin" type="button" aria-label="zoom in">+</button><button id="bagBtn" type="button" aria-label="open bag">BAG</button><button id="snd" type="button" aria-label="toggle sound">SOUND ON</button><button id="pz" type="button" aria-label="pause">II</button></div>
+  <div id="tools"><button id="zout" type="button" aria-label="zoom out">&minus;</button><button id="zmap" type="button" aria-label="toggle map view">MAP</button><button id="zin" type="button" aria-label="zoom in">+</button><button id="bagBtn" type="button" aria-label="open bag">BAG</button><button id="audBtn" type="button" aria-label="music and sound settings">&#9834;</button><button id="snd" type="button" aria-label="toggle sound">SOUND ON</button><button id="pz" type="button" aria-label="pause">II</button></div>
   <div id="boss"><b>THE EDITOR</b><div id="bossbar"><div></div></div></div>
   <div id="arrow">&gt;<small></small></div>
   <div id="msg"></div>
@@ -202,7 +220,7 @@ body.cap #card, body.cap #msg, body.cap #hint, body.cap #tools, body.cap #arrow,
   <div class="lead">Something is deleting the world, one word at a time. You are the last Scribe. It is an open world: no walls, five lands, any order. Ride, climb the towers, light fires, find the letters and write the world back.</div>
   <div id="loading" class="tag" style="margin-top:30px;color:var(--gold)">WRITING THE WORLD...</div>
   <div class="row" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center"><button id="cont" class="go" type="button" style="display:none">CONTINUE</button><button id="start" class="go" type="button" style="visibility:hidden">NEW GAME</button></div>
-  <div class="keys" id="keys">WASD / ARROWS move &nbsp;·&nbsp; CLICK / J strike &nbsp;·&nbsp; SHIFT / K / RIGHT CLICK dash<br>R call or leave your horse &nbsp;·&nbsp; E climb a tower, talk &nbsp;·&nbsp; F light a campfire<br>Q switch weapon &nbsp;·&nbsp; 1 fire &nbsp;·&nbsp; 2 lightning &nbsp;·&nbsp; I bag &nbsp;·&nbsp; drink elixirs, pick up loot<br>MOUSE WHEEL or + &minus; zoom &nbsp;·&nbsp; Z map &nbsp;·&nbsp; M sound &nbsp;·&nbsp; ESC pause</div>
+  <div class="keys" id="keys">WASD / ARROWS move &nbsp;·&nbsp; CLICK / J strike &nbsp;·&nbsp; SHIFT / K / RIGHT CLICK dash<br>R call or leave your horse &nbsp;·&nbsp; E climb a tower, talk &nbsp;·&nbsp; F light a campfire<br>Q switch weapon &nbsp;·&nbsp; 1 fire &nbsp;·&nbsp; 2 lightning &nbsp;·&nbsp; I bag &nbsp;·&nbsp; N next music track &nbsp;·&nbsp; ESC pause, volume<br>MOUSE WHEEL or + &minus; zoom &nbsp;·&nbsp; Z map &nbsp;·&nbsp; M sound &nbsp;·&nbsp; ESC pause</div>
 </div>
 
 <div id="bag" class="screen"><div class="box">
@@ -210,11 +228,18 @@ body.cap #card, body.cap #msg, body.cap #hint, body.cap #tools, body.cap #arrow,
   <div class="cols">
     <div class="col"><span>WORN</span><div id="gearSlots"></div><span style="margin-top:8px">TOTAL</span><div id="gearTot"></div></div>
     <div class="col"><span>CARRIED</span><div id="bagList"></div></div>
-    <div class="col"><span>SELECTED</span><div id="bagInfo"></div><div id="bagAct" style="display:flex"><button id="bagEquip" type="button">WEAR IT</button><button id="bagSalv" type="button">SALVAGE FOR XP</button><button id="bagJunk" type="button">SALVAGE ALL GREY</button></div></div>
+    <div class="col"><span>SELECTED</span><div id="bagInfo"></div><div id="bagAct" style="display:flex"><button id="bagEquip" type="button">WEAR IT</button><button id="bagSalv" type="button">SALVAGE: XP + DUST</button><button id="bagJunk" type="button">SALVAGE ALL GREY</button></div></div>
   </div>
 </div></div>
 
-<div id="pause" class="screen"><div class="t" style="font-size:32px;font-weight:800;letter-spacing:.3em">PAUSED</div><div class="row" style="margin-top:22px;display:flex;gap:10px"><button id="resume" type="button">RESUME</button><button id="quit" type="button">TITLE</button></div></div>
+<div id="shop" class="screen"><div class="box">
+  <h2><span id="shopTitle"></span><button id="shopClose" type="button">CLOSE [E]</button></h2>
+  <div id="shopLine"></div><div id="shopMats"></div><div id="shopList"></div>
+</div></div>
+
+<div id="pause" class="screen"><div class="t" style="font-size:32px;font-weight:800;letter-spacing:.3em">PAUSED</div>
+  <div class="aud"><label>MUSIC <input id="volM" type="range" min="0" max="100" step="1" aria-label="music volume"></label><label>SOUNDS <input id="volS" type="range" min="0" max="100" step="1" aria-label="sound effects volume"></label>
+  <div class="tr">TRACK <div><button id="trPrev" type="button" aria-label="previous track">&lt;</button><span id="trName"></span><button id="trNext" type="button" aria-label="next track">&gt;</button></div></div></div><div class="row" style="margin-top:22px;display:flex;gap:10px"><button id="resume" type="button">RESUME</button><button id="quit" type="button">TITLE</button></div></div>
 
 <div id="end" class="screen">
   <div class="t">THE END</div>
