@@ -82,7 +82,8 @@ function glow(x, y, r, int, col, life) { W.glows.push({ x, y, r, int, col, life,
 const floats = [];
 function floatText(x, y, h, text, cls) {
   const el = document.createElement('div'); el.className = 'ft ' + cls; el.textContent = text; $('fx').appendChild(el);
-  floats.push({ el, x: x + rnd(-0.3, 0.3), y, h, t: nowMs() }); if (floats.length > 24) floats.shift().el.remove();
+  const f = { el, x: x + rnd(-0.3, 0.3), y, h, t: nowMs() }; floats.push(f); if (floats.length > 24) floats.shift().el.remove();
+  return f;
 }
 function removeObj(o) { if (o && o.parent) o.parent.remove(o); }
 
@@ -613,7 +614,7 @@ function deathFx(e) {
   if (e.elite) { freeze(0.08); S.shake = Math.max(S.shake, 0.6); pulse(e.x, e.y, [1, 0.82, 0.35], 2, 11, 0.9); after(0.12, () => pulse(e.x, e.y, [1, 0.82, 0.35], 1.4, 8, 0.7)); glow(e.x, e.y, 9, 2, [1, 0.82, 0.35], 0.8); burst(e.x, e.y, 1.4, 30, 0xffd060, 9); }
   // kills in quick succession are counted out loud
   W.streak = S.t - (W.streakT || -9) < 2.6 ? (W.streak || 1) + 1 : 1; W.streakT = S.t;
-  if (W.streak >= 2) floatText(P.x, P.y, 3.9 + P.h, 'x' + W.streak + (W.streak >= 8 ? '  UNSTOPPABLE' : W.streak >= 5 ? '  RAMPAGE' : ''), 'streak');
+  if (W.streak >= 2) { if (W.streakF) { W.streakF.el.remove(); const k = floats.indexOf(W.streakF); if (k >= 0) floats.splice(k, 1); } W.streakF = floatText(P.x, P.y, 3.9 + P.h, 'x' + W.streak + (W.streak >= 8 ? '  UNSTOPPABLE' : W.streak >= 5 ? '  RAMPAGE' : ''), 'streak'); W.streakF.x = P.x; }
 }
 function hitFx(e, crit) { if (crit) { burst(e.x, e.y, 1.1, 10, 0xffd060, 7); glow(e.x, e.y, 4, 1.4, [1, 0.8, 0.3], 0.25); freeze(0.035); } else burst(e.x, e.y, 0.9, 3, MOBCOL[e.type] || 0xc9a8ff, 4); }
 function swingFx(wp, spin) {
