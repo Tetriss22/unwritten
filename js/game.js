@@ -671,7 +671,7 @@ function updateFire(dt) {
       f.t += dt; const cx = (f.bx + 0.5) * FB / 8, cy = (f.by + 0.5) * FB / 8;
       if (!f.spread && f.t > 0.3) { f.spread = true; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && Math.random() < 0.8) igniteAt(cx + dx * FB / 8, cy + dy * FB / 8); }
       if (f.t > 1.2) { W.B.scorch(f.bx * FB, f.by * FB, FB, 2); W.fires.delete(key); W.burnt.add(key); W.fireDirty = true; }
-      else if (Math.random() < dt * 1.2) burst(cx, cy, 0.3, 1, Math.random() < 0.5 ? 0xffb050 : 0xff6a3a, 2.4);
+      else if (Math.random() < dt * 3) burst(cx + rnd(-0.25, 0.25), cy + rnd(-0.25, 0.25), rnd(0.2, 0.9), 1, Math.random() < 0.5 ? 0xffb050 : 0xff6a3a, 2.2);
     }
     W.fireGlow = (W.fireGlow || 0) - dt; if (W.fireGlow <= 0) { W.fireGlow = 0.1; const fs = [...W.fires.values()], f = fs[Math.floor(Math.random() * fs.length)]; if (f) glow((f.bx + 0.5) * FB / 8, (f.by + 0.5) * FB / 8, 7, 1.8, [1, 0.55, 0.2], 0.45); }
     W.fireTick = (W.fireTick || 0) - dt;
