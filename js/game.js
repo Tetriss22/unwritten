@@ -123,7 +123,7 @@ function loadWorld() {
   W.npcs = B.npcs.map(n => { const g = M.makeNPC(n.hue); place(g, n.x, n.y); R.root.add(g); return { ...n, g, ph: rnd(6) }; });
   W.drops = []; W.firstDrop = false; W.arrows = []; W.fires = new Map(); W.burnt = new Set(); W.fireDirty = false; P.mats = { dust: 0, ess: 0 }; P.owned = {}; P.perm = { ink: 0 }; P.gear = { robe: null, ring: null, charm: null }; P.bag = []; P.st = null; W.fire = null; W.said = {}; W.fireballs = []; W.burns = []; W.bolts = []; W.skybolts = []; spawnElixirs(); spawnCaches(); spawnWild();
   if (!P.m) P.m = M.makeHero();
-  R.root.add(P.m.g); P.m.g.visible = true; tintRobe(); P.mark = M.makeHeroMark(); R.root.add(P.mark);
+  R.root.add(P.m.g); P.m.g.visible = true; tintRobe();
   P.lvl = 1; P.xp = 0; applyLevel(); P.ink = P.maxInk; setWeapon(0);
   Object.assign(P, { x: B.start.x, y: B.start.y, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: P.maxHp, inv: 0, dashT: 0, atkT: 0, cx: B.start.x, cy: B.start.y, h: 0, hTo: 0, up: null, mounted: false });
   S.camX = P.x; S.camY = P.y; S.land = 0;
@@ -914,7 +914,6 @@ function updatePlayer(dt) {
 function poseHero(dt) {
   const p = P, m = p.m, play = S.mode === 'play', speed = play ? Math.hypot(p.vx, p.vy) : 0;
   place(m.g, p.x, p.y, p.h + (p.mounted ? 0.82 : 0)); m.g.rotation.y = rotY(p.face);
-  if (p.mark) { place(p.mark, p.x, p.y, 0); p.mark.visible = m.g.visible && !p.up; p.mark.userData.ring.scale.setScalar((p.mounted ? 1.5 : 1.12) + Math.sin(S.t * 3) * 0.04); }
   m.legs[0].visible = m.legs[1].visible = !p.mounted;
   const cf = Math.cos(p.face), sf = Math.sin(p.face);
   const wvx = play ? p.vx + p.kx : 0, wvy = play ? p.vy + p.ky : 0;
@@ -971,7 +970,7 @@ function enterLand(i) {
 const BASE = { blot: { hp: 2, r: 0.42, er: 1.05, sp: 2.5 }, scratch: { hp: 2, r: 0.38, er: 0.9, sp: 1.9 }, brute: { hp: 7, r: 0.74, er: 1.55, sp: 1.35 }, boss: { hp: 54, r: 1.5, er: 2.4, sp: 0 },
   typo: { hp: 1, r: 0.28, er: 0.7, sp: 4.3 }, asterisk: { hp: 2, r: 0.42, er: 1.0, sp: 3.2 }, ghost: { hp: 3, r: 0.45, er: 1.0, sp: 2.2 }, redactor: { hp: 16, r: 0.8, er: 1.7, sp: 1.5 }, mimic: { hp: 9, r: 0.6, er: 1.2, sp: 3.5 } };
 function spawnEnemy(type, x, y, owner = null, sleep = false) {
-  const b = BASE[type], o = M.makeEnemy(type), land = W.T.regAt(x, y);
+  const b = BASE[type], land = W.T.regAt(x, y), o = M.makeEnemy(type, Math.max(0, land));
   const hp = b.hp + (type === 'blot' && land >= 3 ? 1 : 0) + (type === 'brute' && land >= 4 ? 2 : 0) + (type === 'redactor' ? land * 2 : 0);
   const e = { type, land, x, y, hx: x, hy: y, kx: 0, ky: 0, hp, maxHp: hp, r: b.r, er: b.er, sp: b.sp * (1 + land * 0.05), o, state: sleep ? 'sleep' : 'spawn', t: 0, cd: rnd(0.5, 1.4), face: rnd(6), dx: 0, dy: 0, flash: 0, owner, dead: false, grow: sleep ? 1 : 0, strafe: Math.random() < 0.5 ? 1 : -1, ph: rnd(6) };
   place(o.g, x, y); o.g.scale.setScalar(sleep ? 1 : 0.01); R.root.add(o.g); W.enemies.push(e);

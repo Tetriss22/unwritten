@@ -363,6 +363,10 @@ export class Renderer {
     this.flat = new THREE.MeshBasicMaterial({ color: 0xd8d0ff });
     this.terrainTex = null; this.ox = 0; this.oy = 0;
     this.xray = gmat(0xb8a8ff, 'xray', { glow: true, depthFunc: THREE.GreaterDepth });
+    // one unbroken line round the Scribe: the hero drawn a few pixels fat in a flat colour, then the hero on top of it
+    this.outline = new THREE.ShaderMaterial({ uniforms: { uPx: { value: 3 }, uRes: { value: new THREE.Vector2(1, 1) } }, side: THREE.DoubleSide, depthWrite: false,
+      vertexShader: 'uniform float uPx; uniform vec2 uRes; void main() { vec4 c = projectionMatrix * modelViewMatrix * vec4(position, 1.0); vec3 n = normalMatrix * normal; float l = length(n.xy); if (l > 1e-4) c.xy += n.xy / l * uPx * 2.0 / uRes * c.w; gl_Position = c; }',
+      fragmentShader: 'void main() { gl_FragColor = vec4(1.0, 0.96, 0.82, 1.0); }' });
     this.resize();
   }
 
@@ -455,6 +459,8 @@ export class Renderer {
     cam.layers.set(1); r.render(scene, cam); r.clearDepth();           // the Editor first, depth thrown away: it never hides anything
     cam.layers.set(0); cam.layers.enable(2); r.render(scene, cam);
     cam.layers.set(3); scene.overrideMaterial = this.xray; r.render(scene, cam); scene.overrideMaterial = null;   // the hero's outline through walls
+    r.getDrawingBufferSize(this.outline.uniforms.uRes.value); this.outline.uniforms.uPx.value = Math.max(2, this.outline.uniforms.uRes.value.y / 300);
+    scene.overrideMaterial = this.outline; r.render(scene, cam); scene.overrideMaterial = null;
     r.render(scene, cam);                                               // then the hero
     r.render(this.overScene, this.fsCam);
     r.autoClear = true;

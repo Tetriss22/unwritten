@@ -151,12 +151,15 @@ export function makeHorse() {
 }
 // ---------- the people who stayed
 export function makeNPC(k) {
-  const g = new THREE.Group(), cols = [0xffd98a, 0x9be070, 0xff9a5c, 0x8ad8ff, 0xffa8d0], c = cols[k % cols.length];
-  const robe = gmat(c, 'cape', { lift: 0.35 }), skin = gmat(0xffe6d0, 'skin', { lift: 0.35 });
+  // twelve cloths; coat, shawl and hat each take a different one, and there are three kinds of hat
+  const g = new THREE.Group(), cols = [0xffd98a, 0x9be070, 0xff9a5c, 0x8ad8ff, 0xffa8d0, 0xc9a8ff, 0x6fe0c0, 0xf2f25a, 0xff7a7a, 0x7aa8ff, 0xe8e8f0, 0xd0a070];
+  const m = (i) => gmat(cols[i % 12], 'cape', { lift: 0.35 }), robe = m(k), shawl = m(k * 5 + 3), hat = m(k * 7 + 6), skin = gmat(0xffe6d0, 'skin', { lift: 0.35 });
   part(g, G.frust, robe, 0.95, 1.5, 0.9, 0, 0.75, 0);
-  part(g, G.frust, robe, 0.8, 0.3, 0.75, 0, 1.6, 0);
+  part(g, G.frust, shawl, 0.8, 0.3, 0.75, 0, 1.6, 0); part(g, G.cyl, shawl, 0.74, 0.1, 0.7, 0, 0.95, 0);
   part(g, G.sph, skin, 0.4, 0.42, 0.4, 0, 1.95, 0.03);
-  part(g, G.cyl, robe, 0.75, 0.07, 0.75, 0, 2.15, 0); part(g, G.cone, robe, 0.42, 0.4, 0.42, 0, 2.36, 0);
+  if (k % 3 === 0) { part(g, G.cyl, hat, 0.75, 0.07, 0.75, 0, 2.15, 0); part(g, G.cone, hat, 0.42, 0.4, 0.42, 0, 2.36, 0); }
+  else if (k % 3 === 1) { part(g, G.cyl, hat, 0.5, 0.2, 0.5, 0, 2.2, 0); part(g, G.box, hat, 0.3, 0.05, 0.3, 0, 2.14, 0.3); }
+  else part(g, G.sph, hat, 0.5, 0.46, 0.5, 0, 2.02, -0.06);
   part(g, G.sph, Gl(0x201830, 'eye'), 0.07, 0.07, 0.05, -0.09, 1.96, 0.21); part(g, G.sph, Gl(0x201830, 'eye'), 0.07, 0.07, 0.05, 0.09, 1.96, 0.21);
   return g;
 }
@@ -171,9 +174,13 @@ export function makeCampfire() {
 }
 
 // ---------- the unwriters: heavy purple symbols, red eyes
-export function makeEnemy(type) {
+// every kind of unwriter has its own colour, and each land leans them a little toward its own
+const MOB = { blot: [0xb890ff, 0x8a62e0, 0xff3a5a], scratch: [0x5fe0d0, 0x2fa8a0, 0xffd040], brute: [0xff9a4a, 0xd06a20, 0xfff1c9], typo: [0xc8f04a, 0x8fc020, 0xff3a5a], asterisk: [0x7a9cff, 0x4a6ae0, 0xffffff], ghost: [0xd8ecff, 0xa8c8f0, 0x7fd8ff], redactor: [0x9aa4d8, 0x7482c8, 0xff3a5a], mimic: [0xc8a060, 0xa07840, 0xff3a5a] };
+const LAND_LEAN = [null, 0x8ad8ff, 0xff7a4a, 0xf0f8ff, 0xffffff];
+export function makeEnemy(type, land = 0) {
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
-  const ink = gmat(0xb890ff, 'ink', { lift: 0.3 }), ink2 = gmat(0x8a62e0, 'ink2', { lift: 0.3 }), eye = Gl(0xff3a5a, 'eye');
+  const mc = MOB[type] || MOB.blot, lean = (hex) => LAND_LEAN[land] ? new THREE.Color(hex).lerp(new THREE.Color(LAND_LEAN[land]), 0.28).getHex() : hex;
+  const ink = gmat(lean(mc[0]), 'ink', { lift: 0.3 }), ink2 = gmat(lean(mc[1]), 'ink2', { lift: 0.3 }), eye = Gl(mc[2], 'eye');
   const o = { g, body, type };
   if (type === 'blot') {
     part(body, G.sph, ink, 1.0, 0.86, 1.0, 0, 0.5, 0);
@@ -202,12 +209,12 @@ export function makeEnemy(type) {
     for (let i = 0; i < 6; i++) { const sp = part(o.star, G.cone4, ink, 0.24, 0.66, 0.24, Math.cos(i * 1.047) * 0.52, Math.sin(i * 1.047) * 0.52, 0); sp.rotation.z = i * 1.047 - Math.PI / 2; }
     part(body, G.sph, eye, 0.18, 0.18, 0.1, 0, 0.85, 0.26);
   } else if (type === 'ghost') {           // the Ghostwriter: never where you last saw it
-    const pale = gmat(0xd8ecff, 'cape', { lift: 0.5 }), blue = Gl(0x7fd8ff, 'eye');
+    const pale = gmat(lean(mc[0]), 'cape', { lift: 0.5 }), blue = eye;
     part(body, G.cone, pale, 0.95, 1.6, 0.95, 0, 1.1, 0); part(body, G.sph, pale, 0.58, 0.58, 0.58, 0, 2.0, 0);
     part(body, G.sph, blue, 0.14, 0.18, 0.1, -0.13, 2.02, 0.26); part(body, G.sph, blue, 0.14, 0.18, 0.1, 0.13, 2.02, 0.26);
     part(body, G.cone4, Gl(0xffffff, 'quill'), 0.1, 0.9, 0.05, 0.62, 1.5, 0.2).rotation.z = -0.4;
   } else if (type === 'redactor') {        // a slab that blacks things out
-    const slab = gmat(0x6a58a8, 'brick', { lift: 0.3 }), bar = Gl(0xffffff, 'gold');
+    const slab = gmat(lean(mc[0]), 'brick', { lift: 0.3 }), bar = Gl(0xffffff, 'gold');
     part(body, G.box, slab, 1.5, 2.6, 0.7, 0, 1.3, 0);
     for (let i = 0; i < 3; i++) part(body, G.box, bar, 1.15 - i * 0.2, 0.13, 0.06, -i * 0.1, 0.7 + i * 0.45, 0.37);
     part(body, G.box, eye, 0.95, 0.18, 0.1, 0, 2.2, 0.37);
@@ -524,13 +531,4 @@ export function makeArrow() {
   part(g, G.cyl, w, 0.05, 1.1, 0.05, 0, 0, 0).rotation.x = Math.PI / 2; part(g, G.cone4, Gl(0xffe066, 'gold'), 0.16, 0.34, 0.16, 0, 0, 0.68).rotation.x = Math.PI / 2;
   part(g, G.oct, w, 0.03, 0.22, 0.36, 0, 0, -0.5);
   return noShadow(g);
-}
-
-// ---------- what marks the Scribe out from everything else: a dark patch under the feet and a ring of light round it
-export function makeHeroMark() {
-  const g = new THREE.Group();
-  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.0, 28), new THREE.MeshBasicMaterial({ color: 0x04050a, transparent: true, opacity: 0.62, depthWrite: false }));
-  disc.rotation.x = -Math.PI / 2; disc.position.y = 0.03; g.add(disc);
-  const ring = part(g, G.ring, Gl(0xfff1c9, 'gold', { side: THREE.DoubleSide }), 1.12, 1.12, 1.12, 0, 0.05, 0); ring.rotation.x = -Math.PI / 2;
-  g.userData.ring = ring; return noShadow(g);
 }
