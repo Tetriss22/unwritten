@@ -329,15 +329,17 @@ export function makeProp(p) {
       for (let i = 0; i < 4; i++) { const b = new THREE.Group(); b.rotation.z = i * Math.PI / 2; hub.add(b); part(b, G.box, L(0xffffff, 'hay'), 0.56 * s, 2.4 * s, 0.06 * s, 0, 1.35 * s, 0); part(b, G.box, L(0xc8b090, 'wood'), 0.09 * s, 2.7 * s, 0.09 * s, 0, 1.35 * s, -0.06 * s); }
       g.rotation.y = p.rot; break;
     }
-    case 'ruinwall': {
-      const st = L(0xd8e0f0, 'brick', true), win = Gl(0xffd890, 'window');
+    case 'ruinwall': {      // what is left of the library: a wall of bays, books still on some shelves, the top broken off
+      const st = L(0xd8e0f0, 'brick', true), back = L(0x8a94b0, 'brick', true), books = [0xff9a5c, 0x62d8b8, 0xffe9a8, 0xc9a8ff, 0x8ad8ff].map(c => L(c, 'book', true));
       add(G.box, st, 5.0, 0.5, 0.7, 0, 0.25, 0);
       for (let i = 0; i < 4; i++) add(G.box, st, 0.5, 3.6 - (i === 3 ? v * 1.6 : 0), 0.8, -2.25 + i * 1.5, 1.8 - (i === 3 ? v * 0.8 : 0), 0);
       for (let i = 0; i < 3; i++) {
-        if (i === 2 && v > 0.6) continue;
-        add(G.box, st, 1.0, 0.6, 0.6, -1.5 + i * 1.5, 3.3, 0);
-        add(G.box, win, 0.8, 1.9, 0.2, -1.5 + i * 1.5, 1.6, 0); add(G.cyl, win, 0.8, 0.2, 0.8, -1.5 + i * 1.5, 2.55, 0).rotation.x = Math.PI / 2;
-        add(G.box, st, 0.09, 1.9, 0.26, -1.5 + i * 1.5, 1.6, 0); add(G.box, st, 0.8, 0.09, 0.26, -1.5 + i * 1.5, 1.7, 0);
+        const tall = i === 2 ? 2.0 - v * 1.2 : 3.0 - ((i * 7 + Math.floor(v * 10)) % 3) * 0.45, x = -1.5 + i * 1.5;
+        add(G.box, back, 1.0, tall, 0.3, x, 0.5 + tall / 2, -0.12);
+        for (let r = 0; r * 0.8 + 0.9 < tall; r++) {
+          add(G.box, st, 1.0, 0.09, 0.6, x, 0.55 + r * 0.8, 0.05);
+          if ((i + r + Math.floor(v * 7)) % 4 !== 0) for (let b = 0; b < 4; b++) add(G.box, books[(i * 3 + r * 2 + b + Math.floor(v * 5)) % 5], 0.17, 0.42 + ((b * 5 + r) % 3) * 0.07, 0.34, x - 0.33 + b * 0.22, 0.83 + r * 0.8, 0.12);
+        }
       }
       g.rotation.y = p.rot; break;
     }
@@ -531,4 +533,12 @@ export function makeArrow() {
   part(g, G.cyl, w, 0.05, 1.1, 0.05, 0, 0, 0).rotation.x = Math.PI / 2; part(g, G.cone4, Gl(0xffe066, 'gold'), 0.16, 0.34, 0.16, 0, 0, 0.68).rotation.x = Math.PI / 2;
   part(g, G.oct, w, 0.03, 0.22, 0.36, 0, 0, -0.5);
   return noShadow(g);
+}
+
+// a champion wears a crown
+export function addCrown(o, h) {
+  const gold = Gl(0xffd060, 'gold'), c = new THREE.Group(); c.position.y = h; o.body.add(c);
+  part(c, G.tor, gold, 0.5, 0.5, 1.2, 0, 0, 0).rotation.x = Math.PI / 2;
+  for (let i = 0; i < 5; i++) part(c, G.cone4, gold, 0.12, 0.3, 0.12, Math.cos(i * 1.257) * 0.24, 0.16, Math.sin(i * 1.257) * 0.24);
+  return c;
 }

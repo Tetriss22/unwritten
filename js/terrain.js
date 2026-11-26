@@ -99,6 +99,8 @@ export const LANDS = [
       edge: { grass: 1, pal: [2, 1], bri: [0.8, 1.2], kind: 2 },
       outside: { grass: 1, pal: [7, 7, 8], bri: [0.6, 0.95], kind: 2 },
       field: { grass: 1, pal: [10, 10, 11], bri: [0.75, 1.15], kind: 8 },
+      meadow: { bands: ["*','.", ".'*,'", "',.*"], pal: [15, 11, 14, 2, 15], bri: [0.85, 1.25], kind: 2 },
+      forest: { grass: 1, pal: [7, 4, 7], bri: [0.34, 0.62], kind: 2 },
       barrier: { bands: ['~'], pal: [5], bri: [0.9, 1.1], kind: 1 },
       bridge: { bands: ['='], pal: [10], bri: [1.0, 1.3], kind: 5 },
     },
@@ -343,10 +345,18 @@ export function buildWorld() {
     T.solid[i] = 0;
     if (d >= 0) {            // the wilds: open ground, walk anywhere
       const far = wd > 2.2, pond = far && land !== 2 && land !== 4 && fbm(ux * 0.085, uy * 0.085, 300 + land) > 0.69;
-      if (land === 1 || (pond && land === 0)) { T.put(cx, cy, '~', land * 16 + (land === 1 ? 7 : 5), 0.9, 1); T.tag[i] = 3; }
+      const bio = far ? fbm(ux * 0.065, uy * 0.065, 500) : 0, bio2 = far ? fbm(ux * 0.075, uy * 0.075, 520 + land) : 0;
+      if (land === 1 && far && bio2 > 0.6) paint(T, cx, cy, bio2 > 0.66 ? m.moss : m.edge, seed, land);                 // marsh islands: dry ground out in the water
+      else if (land === 1 && far && bio > 0.64) paint(T, cx, cy, m.floor, seed, land);                                   // sunken reading rooms: stone floors
+      else if (land === 2 && far && bio2 > 0.58) paint(T, cx, cy, bio2 > 0.66 ? m.cooled : m.floor, seed, land);          // ash dunes
+      else if (land === 2 && far && bio > 0.6) paint(T, cx, cy, m.field, seed, land);                                    // scorched grass
+      else if (land === 3 && far && !pond && bio2 > 0.5) paint(T, cx, cy, bio2 > 0.62 ? m.floor : m.edge, seed, land);    // snowfields
+      else if (land === 1 || (pond && land === 0)) { T.put(cx, cy, '~', land * 16 + (land === 1 ? 7 : 5), 0.9, 1); T.tag[i] = 3; }
       else if (pond && land === 3) { paint(T, cx, cy, m.ice, seed, land); T.tag[i] = 2; }
       else if (far && land === 0 && fbm(ux * 0.12, uy * 0.12, 400) > 0.7) paint(T, cx, cy, m.path, seed, land);
       else if (far && land === 0 && fbm(ux * 0.1, uy * 0.1, 450) > 0.61) paint(T, cx, cy, m.field, seed, land);
+      else if (far && land === 0 && bio > 0.52) paint(T, cx, cy, m.forest, seed, land);                                  // dark under the trees
+      else if (far && land === 0 && bio2 > 0.6) paint(T, cx, cy, m.meadow, seed, land);                                  // flower meadows
       else paint(T, cx, cy, m.outside, seed, land);
       continue;
     }
@@ -491,8 +501,9 @@ export function buildWorld() {
   for (let gy = 1; gy < hu - 1; gy += 1.9) for (let gx = 1; gx < wu - 1; gx += 1.9) {
     const x = gx + (R() - 0.5) * 1.5, y = gy + (R() - 0.5) * 1.5;
     if (walk(x, y) < 4.8 || stripAt(x, y, 0.9) || T.tagAt(x, y) === 3) continue;
-    const land = T.regAt(x, y), P = LANDS[land].props, forest = fbm(x * 0.065, y * 0.065, 500) > 0.52;
-    if (R() > (forest ? 0.8 : 0.07) * (land === 1 ? 0.35 : 1) || gates.some(g => segDist(x, y, g.A.x, g.A.y, g.B.x, g.B.y) < 2.6)) continue;
+    const land = T.regAt(x, y), P = LANDS[land].props, forest = fbm(x * 0.065, y * 0.065, 500) > 0.52, crop = (T.data[T.idx(x, y) * 4 + 3] & 127) === 8;
+    if (crop && R() < 0.06) { props.push({ type: 'hay', x, y, s: 0.9 + R() * 0.3, rot: R() * 6.28, v: R() }); continue; }
+    if (crop || R() > (forest ? 0.8 : 0.07) * (land === 1 ? 0.6 : 1) || gates.some(g => segDist(x, y, g.A.x, g.A.y, g.B.x, g.B.y) < 2.6)) continue;
     if (sites.some(q => Math.hypot(q.x - x, q.y - y) < 3) || Math.hypot(x - AR.x, y - AR.y) < 16) continue;
     props.push({ type: forest ? pick(P.border) : pick(P.low.concat(P.inner)), x, y, s: 0.8 + R() * 0.55, rot: R() * 6.28, v: R() });
   }

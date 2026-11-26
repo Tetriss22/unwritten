@@ -168,6 +168,7 @@ function moveEnt(e, dx, dy, r) {
 
 // ---------------------------------------------------------------- player
 function hurtPlayer(dmg, fx, fy, kb = 7) {
+  if (S.curE && S.curE.elite) dmg += 1;
   if (S.god) return;      // filming only
   if (P.dashT > 0 && S.mode === 'play' && S.t - (P.missT || -9) > 0.5) { P.missT = S.t; floatText(P.x, P.y, 2.6, 'miss', 'miss'); }
   if (P.inv > 0 || P.dashT > 0 || S.mode !== 'play' || P.up) return;
@@ -437,6 +438,7 @@ function salvage(it) {
 // what falls out of an unwriter: often nothing, sometimes a colour you have never seen
 function maybeDrop(e) {
   const land = Math.max(0, e.land || 0), chance = { blot: 0.14, scratch: 0.2, brute: 0.7, typo: 0.05, asterisk: 0.18, ghost: 0.35, redactor: 1, mimic: 1 }[e.type] ?? 0.1, elite = e.type === 'brute' || e.type === 'redactor';
+  if (e.elite) return dropItem(e.x, e.y, Math.random() < 0.2 ? 3 : 2, 3 + land * 2 + P.lvl);
   if (e.type === 'mimic') { dropItem(e.x, e.y, Math.random() < 0.25 ? 3 : 2, 3 + land * 2 + P.lvl); dropItem(e.x, e.y, 1, 1 + land * 2 + P.lvl); return; }
   if (!W.firstDrop && e.type !== 'boss') { W.firstDrop = true; return dropItem(e.x, e.y, 1, 1 + land * 2 + P.lvl); }
   if (Math.random() > chance) return;
@@ -672,18 +674,27 @@ function spawnCaches() {
     W.caches.push({ id: i, x, y, kind, mimic: kind === 'chest' && far && r() < 0.24, guard: kind === 'chest' && far && i % 7 === 3, land, ph: r() * 6, g: null, gone: false }); i++;
   }
 }
+// out in the wilds things are tougher than on the roads, and some wear a crown
+const CROWN_H = { blot: 1.25, scratch: 2.3, brute: 2.4, typo: 0.95, asterisk: 1.7, ghost: 2.5, redactor: 2.8 };
+function toughen(e, elite) {
+  e.wild = true; e.hp = e.maxHp = Math.ceil(e.maxHp * [1.6, 2.2, 3, 3.8, 4.6][Math.max(0, e.land)]);
+  if (!elite) return;
+  e.elite = true; e.hp = e.maxHp = Math.ceil(e.maxHp * 2.5 + 4); e.sz = 1.4; e.r *= 1.3; e.sp *= 1.1; e.name = 'Elder ' + (NAMES[e.type] || e.type[0].toUpperCase() + e.type.slice(1));
+  M.addCrown(e.o, CROWN_H[e.type] || 1.5); e.o.g.scale.setScalar(1.4);
+}
 function spawnWild() {
   const r = rng(555), AR = W.B.goals[4], st = W.B.start, spots = [];
   const TABLE = [['typo', 'typo', 'typo', 'asterisk'], ['typo', 'ghost', 'typo', 'asterisk'], ['asterisk', 'asterisk', 'typo', 'ghost'], ['ghost', 'ghost', 'asterisk', 'typo', 'redactor'], ['ghost', 'redactor', 'asterisk', 'typo']];
   const COUNT = { typo: 4, asterisk: 2, ghost: 1, redactor: 1 };
-  for (let n = 0, tries = 0; n < 36 && tries < 30000; tries++) {
+  for (let n = 0, tries = 0; n < 50 && tries < 30000; tries++) {
     const x = 4 + r() * (SIZE[0] - 8), y = 4 + r() * (SIZE[1] - 8);
     if (W.B.walk(x, y) < 2.5 || W.T.blocked(x, y, 1.2) || W.T.tagAt(x, y) !== 0 || dist(x, y, st.x, st.y) < 20 || dist(x, y, AR.x, AR.y) < 20 || spots.some(s => dist(s[0], s[1], x, y) < 11)) continue;
     spots.push([x, y]); n++;
     const tb = TABLE[W.T.regAt(x, y)] || TABLE[0], type = tb[Math.floor(r() * tb.length)];
-    for (let k = 0; k < COUNT[type]; k++) { const a = k * 1.6 + r(), ex = x + (k ? Math.cos(a) * 1.3 : 0), ey = y + (k ? Math.sin(a) * 1.3 : 0); if (!W.T.blocked(ex, ey, 0.5)) spawnEnemy(type, ex, ey, null, true); }
+    const champ = r() < 0.32 && (type !== 'redactor' || W.T.regAt(x, y) >= 3);
+    for (let k = 0; k < COUNT[type]; k++) { const a = k * 1.6 + r(), ex = x + (k ? Math.cos(a) * 1.6 : 0), ey = y + (k ? Math.sin(a) * 1.6 : 0); if (!W.T.blocked(ex, ey, 0.5)) toughen(spawnEnemy(type, ex, ey, null, true), champ && k === 0); }
   }
-  for (const c of W.caches) if (c.guard) for (const [dx, dy] of [[1.9, 0.6], [-1.9, 0.6], [0, -2]]) if (!W.T.blocked(c.x + dx, c.y + dy, 0.9)) { spawnEnemy('redactor', c.x + dx, c.y + dy, null, true); break; }
+  for (const c of W.caches) if (c.guard) for (const [dx, dy] of [[1.9, 0.6], [-1.9, 0.6], [0, -2]]) if (!W.T.blocked(c.x + dx, c.y + dy, 0.9)) { toughen(spawnEnemy('redactor', c.x + dx, c.y + dy, null, true), false); break; }
 }
 function openCache(c) {
   c.gone = true; if (c.g) { removeObj(c.g); c.g = null; }
@@ -992,7 +1003,7 @@ function hitEnemy(e, dmg, a, soft = false, crit = false) {
 function killEnemy(e) {
   e.dead = true;
   if (e.type === 'boss') return bossDead(e);
-  gainXP({ blot: 6, scratch: 8, brute: 20, typo: 3, asterisk: 8, ghost: 14, redactor: 45, mimic: 40 }[e.type] || 5); maybeDrop(e); gainMats(...(KILL_MATS[e.type] || [1, 0]), e.x, e.y);
+  gainXP(Math.round(({ blot: 6, scratch: 8, brute: 20, typo: 3, asterisk: 8, ghost: 14, redactor: 45, mimic: 40 }[e.type] || 5) * (e.elite ? 4 : e.wild ? 1.5 : 1))); if (e.elite) gainMats(8, 1); maybeDrop(e); gainMats(...(KILL_MATS[e.type] || [1, 0]), e.x, e.y);
   if (GS().fx.pop) { pulse(e.x, e.y, [1, 0.55, 0.15], 1.2, 9, 0.4); for (const o of W.enemies) if (!o.dead && o !== e && dist(o.x, o.y, e.x, e.y) < 2.4 + o.r) after(0.08, () => hitEnemy(o, ...roll(1.5), Math.atan2(o.y - e.y, o.x - e.x))); }
   removeObj(e.o.g); audio.play('kill'); glow(e.x, e.y, 4, 1.2, [0.75, 0.55, 1], 0.45);
   burst(e.x, e.y, 0.8, HEAVY[e.type] ? 22 : 12, 0xc9a8ff, 6); pulse(e.x, e.y, [0.8, 0.7, 1], 1, 7, 0.5);
@@ -1007,6 +1018,10 @@ function fire(x, y, a, sp = 5.4) {
   W.shots.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 3.4, g, hostile: true });
 }
 function updateEnemy(e, dt) {
+  S.curE = e; updateEnemy0(e, dt); S.curE = null;
+  if (e.elite && !e.dead && e.state !== 'sleep' && S.mode === 'play') once('elite', 'An Elder. The crowned ones take far more, hit harder, and always drop gold.', 3.8);
+}
+function updateEnemy0(e, dt) {
   const d = dist(e.x, e.y, P.x, P.y), o = e.o;
   if (e.state === 'sleep' && d > 26) return;            // far away and asleep: nothing to do
   const a = Math.atan2(P.y - e.y, P.x - e.x);
@@ -1077,7 +1092,7 @@ function updateEnemy(e, dt) {
   }
   moveEnt(e, (vx + e.kx) * dt, (vy + e.ky) * dt, e.r * 0.8);
   place(o.g, e.x, e.y, hop); o.g.rotation.y = rotY(e.face);
-  o.g.scale.set(e.grow * sxz, e.grow * sy, e.grow * sxz); o.body.rotation.x = lean;
+  const sz = e.sz || 1; o.g.scale.set(e.grow * sxz * sz, e.grow * sy * sz, e.grow * sxz * sz); o.body.rotation.x = lean;
 }
 
 // ---------------------------------------------------------------- THE EDITOR
@@ -1417,7 +1432,7 @@ function updateOverlay() {
   for (const e of W.enemies) {
     const on = near && !e.dead && e.type !== 'boss' && e.state !== 'sleep' && e.grow > 0.9;
     if (!on) { if (e.lab) e.lab.style.display = 'none'; continue; }
-    if (!e.lab) { e.lab = document.createElement('div'); e.lab.className = 'lab'; e.lab.innerHTML = `<span>${NAMES[e.type] || e.type[0].toUpperCase() + e.type.slice(1)}</span><i><b></b></i>`; $('fx').appendChild(e.lab); labels.add(e); }
+    if (!e.lab) { e.lab = document.createElement('div'); e.lab.className = 'lab'; e.lab.innerHTML = `<span${e.elite ? ' style="color:#ffd060"' : ''}>${e.name || NAMES[e.type] || e.type[0].toUpperCase() + e.type.slice(1)}</span><i><b></b></i>`; $('fx').appendChild(e.lab); labels.add(e); }
     const [x, y] = R.toScreen(e.x, e.y, { brute: 2.6, scratch: 2.7, redactor: 3.3, ghost: 3.1, asterisk: 2.0, typo: 1.2, mimic: 1.6 }[e.type] || 1.7);
     e.lab.style.display = 'block'; e.lab.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
     e.lab.lastChild.firstChild.style.width = clamp(e.hp / e.maxHp * 100, 0, 100) + '%';
