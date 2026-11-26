@@ -1655,7 +1655,7 @@ async function boot() {
     audio.pending = LANDS[0].music;
     requestAnimationFrame(frame);
     const q = new URLSearchParams(location.search);
-    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire, castFire, castBolt, gainXP, nextWeapon, tick, setWeapon, say, audio, dropItem, makeItem, equip, toggleBag, RARITY, openCache, toggleShop, gainMats, WEAPONS, igniteCircle, nextTrack };
+    if (q.has('debug')) window.__uw = { S, P, R, get W() { return W; }, LANDS, startGame, wordComplete, hitEnemy, keys, input, lightBeacon, startBoss, spawn: spawnEnemy, hurtPlayer, openGate, save, objective, ride, interact, campfire, castFire, castBolt, gainXP, nextWeapon, tick, setWeapon, say, audio, dropItem, makeItem, equip, toggleBag, RARITY, openCache, toggleShop, gainMats, WEAPONS, igniteCircle, nextTrack, toughen };
   } catch (err) {
     console.error(err); $('err').style.display = 'flex'; $('title').classList.remove('on');
   }
