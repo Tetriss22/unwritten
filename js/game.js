@@ -69,6 +69,7 @@ function showCard(def) {
 // ---------------------------------------------------------------- effects
 function pulse(x, y, col = [1, 0.95, 0.8], w = 1, v = 7, life = 0.7, r0 = 0.2) { W.pulses.push({ x, y, r: r0, v, life, max: life, col, w }); if (W.pulses.length > 24) W.pulses.shift(); }
 function burst(x, y, h, n, hex = 0xffffff, sp = 4.5) {
+  n = Math.min(n, 150 - W.parts.length); if (n <= 0) return;
   for (let i = 0; i < n; i++) {
     const m = M.makeChunk(hex), a = rnd(6.283), s = rnd(0.4, 1) * sp;
     m.scale.setScalar(rnd(0.14, 0.3)); R.root.add(m);
@@ -176,7 +177,7 @@ function hurtPlayer(dmg, fx, fy, kb = 7) {
   if (P.mounted) dismount();
   P.hp -= dmg; P.inv = 1.15;
   const a = Math.atan2(P.y - fy, P.x - fx); P.kx = Math.cos(a) * kb; P.ky = Math.sin(a) * kb;
-  S.flash = 1; S.shake = Math.max(S.shake, 0.5); S.hitstop = 0.09; audio.play('hurt');
+  S.flash = 1; S.shake = Math.max(S.shake, 0.5); S.hitstop = 0.05; audio.play('hurt');
   floatText(P.x, P.y, 2.6, '-' + dmg, 'hurt'); glow(P.x, P.y, 3.2, 1.0, [1, 0.25, 0.35], 0.35);
   burst(P.x, P.y, 1, 6, 0xff8fc8, 4); hudHearts();
   if (P.hp <= 0) die();
@@ -299,7 +300,7 @@ function gainXP(n, raw = false) {
   while (P.xp >= xpNeed(P.lvl)) {
     P.xp -= xpNeed(P.lvl); P.lvl++; applyLevel(); P.hp = P.maxHp; P.ink = P.maxInk; hudHearts();
     audio.play('word'); pulse(P.x, P.y, [1, 0.9, 0.5], 1.8, 10, 1.0); glow(P.x, P.y, 9, 1.6, [1, 0.9, 0.5], 1.0); burst(P.x, P.y, 1.5, 24, 0xffe9a8, 8);
-    floatText(P.x, P.y, 3.8 + P.h, 'LEVEL ' + P.lvl, 'lvl'); for (let k = 0; k < 6; k++) after(k * 0.07, () => burst(P.x, P.y, 0.4 + k * 0.5, 8, 0xffe9a8, 3)); after(0.25, () => pulse(P.x, P.y, [1, 0.9, 0.5], 1.2, 14, 0.9)); S.hitstop = Math.max(S.hitstop, 0.12);
+    floatText(P.x, P.y, 3.8 + P.h, 'LEVEL ' + P.lvl, 'lvl'); for (let k = 0; k < 6; k++) after(k * 0.07, () => burst(P.x, P.y, 0.4 + k * 0.5, 8, 0xffe9a8, 3)); after(0.25, () => pulse(P.x, P.y, [1, 0.9, 0.5], 1.2, 14, 0.9)); freeze(0.06);
     const w = WEAPONS.find(w => w.lvl === P.lvl);
     say('Level ' + P.lvl + '. ' + (w ? 'New weapon: ' + w.name + '. Press Q to switch.' : P.lvl === SPELLS.bolt.lvl ? 'New spell: BOLT. Press 2.' : 'Your hand is heavier and your ink runs deeper.'), 3.4);
   }
@@ -600,6 +601,7 @@ function bindShop() {
   });
   $('shopClose').addEventListener('click', () => toggleShop(null));
 }
+function freeze(t) { if (S.t - (S.freezeT ?? -9) < 0.6) return; S.freezeT = S.t; S.hitstop = Math.max(S.hitstop, t); }
 // ---- small effects that make things feel hit, walked on and alive
 const MOBCOL = { blot: 0xb890ff, scratch: 0x5fe0d0, brute: 0xff9a4a, typo: 0xc8f04a, asterisk: 0x7a9cff, ghost: 0xd8ecff, redactor: 0x9aa4d8, mimic: 0xffd98a };
 const MOTE = [0xd8ff8a, 0x8ad8ff, 0xff8a4a, 0xffffff, 0xc9a8ff], DUST = [0xcfe8b0, 0xa8e0ff, 0xd8c0b0, 0xffffff, 0xe0d0ff];
@@ -608,12 +610,12 @@ function deathFx(e) {
   const col = MOBCOL[e.type] || 0xc9a8ff, rgb = rgbOf(col), big = HEAVY[e.type] || e.elite;
   burst(e.x, e.y, 0.8, big ? 26 : 12, col, 6); burst(e.x, e.y, 0.4, big ? 10 : 5, 0xffffff, 3); pulse(e.x, e.y, rgb, 1, 7, 0.5);
   W.scars.push({ x: e.x, y: e.y, a: 0, t: 0, spin: true }); if (W.scars.length > 4) W.scars.shift();
-  if (e.elite) { S.hitstop = Math.max(S.hitstop, 0.16); S.shake = Math.max(S.shake, 0.6); pulse(e.x, e.y, [1, 0.82, 0.35], 2, 11, 0.9); after(0.12, () => pulse(e.x, e.y, [1, 0.82, 0.35], 1.4, 8, 0.7)); glow(e.x, e.y, 9, 2, [1, 0.82, 0.35], 0.8); burst(e.x, e.y, 1.4, 30, 0xffd060, 9); }
+  if (e.elite) { freeze(0.08); S.shake = Math.max(S.shake, 0.6); pulse(e.x, e.y, [1, 0.82, 0.35], 2, 11, 0.9); after(0.12, () => pulse(e.x, e.y, [1, 0.82, 0.35], 1.4, 8, 0.7)); glow(e.x, e.y, 9, 2, [1, 0.82, 0.35], 0.8); burst(e.x, e.y, 1.4, 30, 0xffd060, 9); }
   // kills in quick succession are counted out loud
   W.streak = S.t - (W.streakT || -9) < 2.6 ? (W.streak || 1) + 1 : 1; W.streakT = S.t;
   if (W.streak >= 2) floatText(P.x, P.y, 3.9 + P.h, 'x' + W.streak + (W.streak >= 8 ? '  UNSTOPPABLE' : W.streak >= 5 ? '  RAMPAGE' : ''), 'streak');
 }
-function hitFx(e, crit) { if (crit) { burst(e.x, e.y, 1.1, 10, 0xffd060, 7); glow(e.x, e.y, 4, 1.4, [1, 0.8, 0.3], 0.25); S.hitstop = Math.max(S.hitstop, 0.09); } else burst(e.x, e.y, 0.9, 3, MOBCOL[e.type] || 0xc9a8ff, 4); }
+function hitFx(e, crit) { if (crit) { burst(e.x, e.y, 1.1, 10, 0xffd060, 7); glow(e.x, e.y, 4, 1.4, [1, 0.8, 0.3], 0.25); freeze(0.035); } else burst(e.x, e.y, 0.9, 3, MOBCOL[e.type] || 0xc9a8ff, 4); }
 function swingFx(wp, spin) {
   const fx = Math.cos(P.face), fy = Math.sin(P.face), T = W.T;
   if ((T.data[T.idx(P.x + fx, P.y + fy) * 4 + 3] & 127) === 8) burst(P.x + fx * 1.2, P.y + fy * 1.2, 0.5, 7, 0xffd98a, 4);        // cut wheat flies
@@ -631,7 +633,7 @@ function updateFx(dt) {
   if (sp > 3 && !P.up && W.stepFx <= 0) { W.stepFx = 0.11; burst(P.x - P.vx / sp * 0.3, P.y - P.vy / sp * 0.3, 0.12, P.mounted ? 2 : 1, tag === 3 ? 0x8ad8ff : DUST[land], tag === 3 ? 3 : 1.4); if (tag === 3 && Math.random() < 0.3) pulse(P.x, P.y, [0.5, 0.8, 1], 0.4, 3, 0.4); }
   if (P.dashT > 0) burst(P.x, P.y, rnd(0.4, 2), 2, 0xffffff, 1);
   // motes in the air of each land
-  if (Math.random() < dt * 4) burst(P.x + rnd(-11, 11), P.y + rnd(-8, 8), rnd(0.3, 2.6), 1, MOTE[land], 0.7);
+  if (Math.random() < dt * 2) burst(P.x + rnd(-11, 11), P.y + rnd(-8, 8), rnd(0.3, 2.6), 1, MOTE[land], 0.7);
   // a heartbeat when nearly dead
   if (P.hp > 0 && P.hp <= 2 && P.maxHp > 2) { S.flash = Math.max(S.flash, 0.1 + 0.1 * Math.max(0, Math.sin(S.t * 5.5))); W.beatT = (W.beatT || 0) - dt; if (W.beatT <= 0) { W.beatT = 1.15; pulse(P.x, P.y, [1, 0.25, 0.35], 0.7, 5, 0.6); } }
 }
@@ -1030,9 +1032,9 @@ function hitEnemy(e, dmg, a, soft = false, crit = false) {
   e.kx = Math.cos(a) * kb * (soft ? 0.12 : 1); e.ky = Math.sin(a) * kb * (soft ? 0.12 : 1);
   if (e.state === 'sleep') e.state = 'chase';
   if (e.type !== 'boss' && !HEAVY[e.type] && (e.state === 'wind' || e.state === 'leap')) { e.state = 'chase'; e.cd = 0.5; }
-  burst(e.x, e.y, 0.9, 4, 0xffffff, 4); audio.play('hit');
+  burst(e.x, e.y, 0.9, 2, 0xffffff, 4); audio.play('hit');
   floatText(e.x, e.y, e.type === 'boss' ? 3.6 : 1.9, (crit ? 'CRIT ' : '') + String(Math.max(1, Math.round(dmg * 10 + rnd(-3, 4)))), crit ? 'dmg critx' : soft ? 'burn' : dmg >= 2 ? 'dmg crit' : 'dmg'); glow(e.x, e.y, 2.4, 1.1, [1, 0.95, 0.85], 0.16);
-  if (!soft) { S.hitstop = Math.max(S.hitstop, dmg > 1 ? 0.07 : 0.04); S.shake = Math.max(S.shake, 0.16); hitFx(e, crit); }
+  if (!soft) { S.shake = Math.max(S.shake, 0.12); hitFx(e, crit); }
   if (e.type === 'boss') $('bossbar').firstChild.style.width = clamp(e.hp / e.maxHp * 100, 0, 100) + '%';
   if (e.hp <= 0) killEnemy(e);
 }
@@ -1636,6 +1638,8 @@ function startGame(cont) {
   if (S.mode !== 'title') return;
   audio.start(); $('title').classList.remove('on'); $('hud').classList.add('on'); document.body.classList.add('playing');
   S.runT = 0; S.deaths = 0; S.mode = 'play';
+  // build every spark colour once now, so the first time one appears in a fight it costs nothing
+  if (!S.warm) { S.warm = true; const cols = [0xffffff, 0xffd060, 0xffe9a8, 0xfff1c9, 0xffa040, 0xffb050, 0xff6a3a, 0xffd98a, 0xe8dcc0, 0xf2f7ff, 0x8ad8ff, 0xff8fc8, 0xc9a8ff, ...Object.values(MOBCOL), ...MOTE, ...DUST], tmp = cols.map(c => { const m = M.makeChunk(c); m.position.set(P.x || 0, -50, P.y || 0); R.root.add(m); return m; }); after(0.5, () => tmp.forEach(removeObj)); }
   const sv = cont && readSave();
   if (sv) { applySave(sv); S.land = -1; enterLand(W.T.regAt(P.x, P.y)); }
   else { clearSave(); S.land = -1; enterLand(0); after(8.5, () => say('No walls out here. Go anywhere. R calls your horse, Z shows the whole world.', 4)); }
