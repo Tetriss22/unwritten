@@ -299,7 +299,7 @@ function gainXP(n, raw = false) {
   while (P.xp >= xpNeed(P.lvl)) {
     P.xp -= xpNeed(P.lvl); P.lvl++; applyLevel(); P.hp = P.maxHp; P.ink = P.maxInk; hudHearts();
     audio.play('word'); pulse(P.x, P.y, [1, 0.9, 0.5], 1.8, 10, 1.0); glow(P.x, P.y, 9, 1.6, [1, 0.9, 0.5], 1.0); burst(P.x, P.y, 1.5, 24, 0xffe9a8, 8);
-    floatText(P.x, P.y, 3.8 + P.h, 'LEVEL ' + P.lvl, 'lvl');
+    floatText(P.x, P.y, 3.8 + P.h, 'LEVEL ' + P.lvl, 'lvl'); for (let k = 0; k < 6; k++) after(k * 0.07, () => burst(P.x, P.y, 0.4 + k * 0.5, 8, 0xffe9a8, 3)); after(0.25, () => pulse(P.x, P.y, [1, 0.9, 0.5], 1.2, 14, 0.9)); S.hitstop = Math.max(S.hitstop, 0.12);
     const w = WEAPONS.find(w => w.lvl === P.lvl);
     say('Level ' + P.lvl + '. ' + (w ? 'New weapon: ' + w.name + '. Press Q to switch.' : P.lvl === SPELLS.bolt.lvl ? 'New spell: BOLT. Press 2.' : 'Your hand is heavier and your ink runs deeper.'), 3.4);
   }
@@ -331,7 +331,7 @@ function castFire() {
     const g = M.makeFireball(), b = a + da; R.root.add(g);
     W.fireballs.push({ x: P.x + Math.cos(b) * 0.8, y: P.y + Math.sin(b) * 0.8, h: 1.3 + P.h, vx: Math.cos(b) * 12, vy: Math.sin(b) * 12, life: 1.1, g });
   }
-  audio.play('fire'); glow(P.x, P.y, 4, 1.2, [1, 0.6, 0.25], 0.25); P.atkCd = Math.max(P.atkCd, 0.2);
+  audio.play('fire'); glow(P.x, P.y, 4, 1.2, [1, 0.6, 0.25], 0.25); burst(P.x + Math.cos(P.face), P.y + Math.sin(P.face), 1.3 + P.h, 8, 0xffa040, 5); S.shake = Math.max(S.shake, 0.15); P.atkCd = Math.max(P.atkCd, 0.2);
 }
 function explode(f) {
   removeObj(f.g); const r = 2.5;
@@ -600,6 +600,41 @@ function bindShop() {
   });
   $('shopClose').addEventListener('click', () => toggleShop(null));
 }
+// ---- small effects that make things feel hit, walked on and alive
+const MOBCOL = { blot: 0xb890ff, scratch: 0x5fe0d0, brute: 0xff9a4a, typo: 0xc8f04a, asterisk: 0x7a9cff, ghost: 0xd8ecff, redactor: 0x9aa4d8, mimic: 0xffd98a };
+const MOTE = [0xd8ff8a, 0x8ad8ff, 0xff8a4a, 0xffffff, 0xc9a8ff], DUST = [0xcfe8b0, 0xa8e0ff, 0xd8c0b0, 0xffffff, 0xe0d0ff];
+const rgbOf = (hex) => [(hex >> 16 & 255) / 255, (hex >> 8 & 255) / 255, (hex & 255) / 255];
+function deathFx(e) {
+  const col = MOBCOL[e.type] || 0xc9a8ff, rgb = rgbOf(col), big = HEAVY[e.type] || e.elite;
+  burst(e.x, e.y, 0.8, big ? 26 : 12, col, 6); burst(e.x, e.y, 0.4, big ? 10 : 5, 0xffffff, 3); pulse(e.x, e.y, rgb, 1, 7, 0.5);
+  W.scars.push({ x: e.x, y: e.y, a: 0, t: 0, spin: true }); if (W.scars.length > 4) W.scars.shift();
+  if (e.elite) { S.hitstop = Math.max(S.hitstop, 0.16); S.shake = Math.max(S.shake, 0.6); pulse(e.x, e.y, [1, 0.82, 0.35], 2, 11, 0.9); after(0.12, () => pulse(e.x, e.y, [1, 0.82, 0.35], 1.4, 8, 0.7)); glow(e.x, e.y, 9, 2, [1, 0.82, 0.35], 0.8); burst(e.x, e.y, 1.4, 30, 0xffd060, 9); }
+  // kills in quick succession are counted out loud
+  W.streak = S.t - (W.streakT || -9) < 2.6 ? (W.streak || 1) + 1 : 1; W.streakT = S.t;
+  if (W.streak >= 2) floatText(P.x, P.y, 3.9 + P.h, 'x' + W.streak + (W.streak >= 8 ? '  UNSTOPPABLE' : W.streak >= 5 ? '  RAMPAGE' : ''), 'streak');
+}
+function hitFx(e, crit) { if (crit) { burst(e.x, e.y, 1.1, 10, 0xffd060, 7); glow(e.x, e.y, 4, 1.4, [1, 0.8, 0.3], 0.25); S.hitstop = Math.max(S.hitstop, 0.09); } else burst(e.x, e.y, 0.9, 3, MOBCOL[e.type] || 0xc9a8ff, 4); }
+function swingFx(wp, spin) {
+  const fx = Math.cos(P.face), fy = Math.sin(P.face), T = W.T;
+  if ((T.data[T.idx(P.x + fx, P.y + fy) * 4 + 3] & 127) === 8) burst(P.x + fx * 1.2, P.y + fy * 1.2, 0.5, 7, 0xffd98a, 4);        // cut wheat flies
+  if (spin) return;
+  if (wp.name === 'PIKE') for (let k = 1; k <= 5; k++) burst(P.x + fx * k * 0.7, P.y + fy * k * 0.7, 1.2, 1, 0xffffff, 1.5);
+  else if (wp.name === 'HAMMER') { const hx = P.x + fx * 1.5, hy = P.y + fy * 1.5; pulse(hx, hy, [1, 0.95, 0.8], 2, 12, 0.6); after(0.1, () => pulse(hx, hy, [1, 0.9, 0.6], 1.2, 8, 0.5)); glow(hx, hy, 7, 1.6, [1, 0.9, 0.7], 0.35); burst(hx, hy, 0.3, 18, 0xe8dcc0, 7); S.shake = Math.max(S.shake, 0.55); }
+  else if (wp.name === 'SABRE') burst(P.x + fx * 1.4, P.y + fy * 1.4, 1.3, 3, 0xf2f7ff, 5);
+  else if (wp.name === 'SWORD') burst(P.x + fx * 1.6, P.y + fy * 1.6, 1.3, 4, 0xffe9a8, 4);
+}
+function updateFx(dt) {
+  if (S.mode !== 'play') return;
+  const land = Math.max(0, S.land), sp = Math.hypot(P.vx, P.vy), T = W.T, tag = T.tagAt(P.x, P.y);
+  // what the feet kick up: dust, water, snow
+  W.stepFx = (W.stepFx || 0) - dt * (P.mounted ? 2 : 1);
+  if (sp > 3 && !P.up && W.stepFx <= 0) { W.stepFx = 0.11; burst(P.x - P.vx / sp * 0.3, P.y - P.vy / sp * 0.3, 0.12, P.mounted ? 2 : 1, tag === 3 ? 0x8ad8ff : DUST[land], tag === 3 ? 3 : 1.4); if (tag === 3 && Math.random() < 0.3) pulse(P.x, P.y, [0.5, 0.8, 1], 0.4, 3, 0.4); }
+  if (P.dashT > 0) burst(P.x, P.y, rnd(0.4, 2), 2, 0xffffff, 1);
+  // motes in the air of each land
+  if (Math.random() < dt * 4) burst(P.x + rnd(-11, 11), P.y + rnd(-8, 8), rnd(0.3, 2.6), 1, MOTE[land], 0.7);
+  // a heartbeat when nearly dead
+  if (P.hp > 0 && P.hp <= 2 && P.maxHp > 2) { S.flash = Math.max(S.flash, 0.1 + 0.1 * Math.max(0, Math.sin(S.t * 5.5))); W.beatT = (W.beatT || 0) - dt; if (W.beatT <= 0) { W.beatT = 1.15; pulse(P.x, P.y, [1, 0.25, 0.35], 0.7, 5, 0.6); } }
+}
 // ---- arrows
 function shootArrow(a) {
   const g = M.makeArrow(); R.root.add(g);
@@ -607,7 +642,7 @@ function shootArrow(a) {
 }
 function updateArrows(dt) {
   for (const s of W.arrows) {
-    s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; s.h += (1.1 - s.h) * Math.min(1, dt * 4); place(s.g, s.x, s.y, s.h); s.g.rotation.y = rotY(s.a);
+    s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt; if (Math.random() < 0.7) burst(s.x, s.y, s.h, 1, 0xfff1c9, 0.5); s.h += (1.1 - s.h) * Math.min(1, dt * 4); place(s.g, s.x, s.y, s.h); s.g.rotation.y = rotY(s.a);
     for (const e of W.enemies) if (!e.dead && !s.hit.includes(e) && dist(e.x, e.y, s.x, s.y) < e.r + 0.4) { s.hit.push(e); const [dm, cr] = roll(WEAPONS[6].dmg); hitEnemy(e, dm, s.a, false, cr); }
     if (s.life <= 0 || s.hit.length >= 2 || (s.h < 2 && W.T.isSolid(s.x, s.y))) { s.dead = true; removeObj(s.g); }
   }
@@ -698,7 +733,7 @@ function spawnWild() {
 }
 function openCache(c) {
   c.gone = true; if (c.g) { removeObj(c.g); c.g = null; }
-  pulse(c.x, c.y, [1, 0.9, 0.5], 1.4, 8, 0.6); glow(c.x, c.y, 6, 1.5, [1, 0.9, 0.5], 0.5); burst(c.x, c.y, 0.5, 14, 0xffe9a8, 6);
+  pulse(c.x, c.y, [1, 0.9, 0.5], 1.4, 8, 0.6); glow(c.x, c.y, 6, 1.5, [1, 0.9, 0.5], 0.5); burst(c.x, c.y, 0.5, 34, 0xffd060, 9); after(0.15, () => burst(c.x, c.y, 1.2, 20, 0xfff1c9, 6)); S.shake = Math.max(S.shake, 0.25);
   if (c.mimic) { const e = spawnEnemy('mimic', c.x, c.y); e.grow = 1; e.state = 'chase'; e.cd = 0.4; audio.play('warn'); S.shake = Math.max(S.shake, 0.4); say('That was never a chest.', 2.2); save(); return; }
   audio.play('free'); const il = 3 + c.land * 2 + P.lvl, n = c.kind === 'buried' ? 2 : Math.random() < 0.4 ? 2 : 1;
   for (let k = 0; k < n; k++) { const q = Math.random(); dropItem(c.x, c.y, c.kind === 'buried' ? (q < 0.12 ? 3 : q < 0.6 ? 2 : 1) : (q < 0.05 ? 3 : q < 0.35 ? 2 : 1), il); }
@@ -841,6 +876,7 @@ function startAttack(mx, my, moving) {
 }
 function doHit() {
   const wp = WEAPONS[P.weapon], spin = P.combo === 3, range = spin ? 2.15 : wp.range, half = spin ? 4 : wp.half, base = spin ? 2 : wp.dmg, st = GS(); let landed = null;
+  swingFx(wp, spin);
   if (wp.bow && !spin) { shootArrow(P.face); return; }
   if (wp.slam) { const hx = P.x + Math.cos(P.face) * 1.5, hy = P.y + Math.sin(P.face) * 1.5; pulse(hx, hy, [1, 0.85, 0.5], 1.5, 8, 0.45, 0.3); glow(hx, hy, 5, 1.5, [1, 0.85, 0.5], 0.3); burst(hx, hy, 0.3, 10, 0xffd98a, 6); S.shake = Math.max(S.shake, 0.45); audio.play('slam'); }
   if (spin) pulse(P.x, P.y, [1, 0.95, 0.8], 0.9, 9, 0.28, 0.4);
@@ -996,7 +1032,7 @@ function hitEnemy(e, dmg, a, soft = false, crit = false) {
   if (e.type !== 'boss' && !HEAVY[e.type] && (e.state === 'wind' || e.state === 'leap')) { e.state = 'chase'; e.cd = 0.5; }
   burst(e.x, e.y, 0.9, 4, 0xffffff, 4); audio.play('hit');
   floatText(e.x, e.y, e.type === 'boss' ? 3.6 : 1.9, (crit ? 'CRIT ' : '') + String(Math.max(1, Math.round(dmg * 10 + rnd(-3, 4)))), crit ? 'dmg critx' : soft ? 'burn' : dmg >= 2 ? 'dmg crit' : 'dmg'); glow(e.x, e.y, 2.4, 1.1, [1, 0.95, 0.85], 0.16);
-  if (!soft) { S.hitstop = Math.max(S.hitstop, dmg > 1 ? 0.07 : 0.04); S.shake = Math.max(S.shake, 0.16); }
+  if (!soft) { S.hitstop = Math.max(S.hitstop, dmg > 1 ? 0.07 : 0.04); S.shake = Math.max(S.shake, 0.16); hitFx(e, crit); }
   if (e.type === 'boss') $('bossbar').firstChild.style.width = clamp(e.hp / e.maxHp * 100, 0, 100) + '%';
   if (e.hp <= 0) killEnemy(e);
 }
@@ -1006,7 +1042,7 @@ function killEnemy(e) {
   gainXP(Math.round(({ blot: 6, scratch: 8, brute: 20, typo: 3, asterisk: 8, ghost: 14, redactor: 45, mimic: 40 }[e.type] || 5) * (e.elite ? 4 : e.wild ? 1.5 : 1))); if (e.elite) gainMats(8, 1); maybeDrop(e); gainMats(...(KILL_MATS[e.type] || [1, 0]), e.x, e.y);
   if (GS().fx.pop) { pulse(e.x, e.y, [1, 0.55, 0.15], 1.2, 9, 0.4); for (const o of W.enemies) if (!o.dead && o !== e && dist(o.x, o.y, e.x, e.y) < 2.4 + o.r) after(0.08, () => hitEnemy(o, ...roll(1.5), Math.atan2(o.y - e.y, o.x - e.x))); }
   removeObj(e.o.g); audio.play('kill'); glow(e.x, e.y, 4, 1.2, [0.75, 0.55, 1], 0.45);
-  burst(e.x, e.y, 0.8, HEAVY[e.type] ? 22 : 12, 0xc9a8ff, 6); pulse(e.x, e.y, [0.8, 0.7, 1], 1, 7, 0.5);
+  deathFx(e);
   if (Math.random() < (P.hp <= 2 ? 0.45 : 0.16)) addHeart(e.x, e.y);
   if (e.owner) {
     const l = e.owner; l.alive = l.alive.filter(x => x !== e);
@@ -1019,6 +1055,7 @@ function fire(x, y, a, sp = 5.4) {
 }
 function updateEnemy(e, dt) {
   S.curE = e; updateEnemy0(e, dt); S.curE = null;
+  if (e.elite && !e.dead && Math.random() < dt * 9) burst(e.x + rnd(-0.6, 0.6), e.y + rnd(-0.6, 0.6), rnd(0.3, 2.4), 1, 0xffd060, 1.2);
   if (e.elite && !e.dead && e.state !== 'sleep' && S.mode === 'play') once('elite', 'An Elder. The crowned ones take far more, hit harder, and always drop gold.', 3.8);
 }
 function updateEnemy0(e, dt) {
@@ -1485,7 +1522,7 @@ function step(dt) {
     for (const e of W.enemies) if (!e.dead) (e.type === 'boss' ? updateBoss : updateEnemy)(e, dt);
     W.enemies = W.enemies.filter(e => !e.dead || e.type === 'boss');
     if (W.bossState === 'fight') updateBossHazards(dt);
-    updateLoot(dt); updateCaches(dt); updateArrows(dt); updateFire(dt);
+    updateLoot(dt); updateCaches(dt); updateArrows(dt); updateFire(dt); updateFx(dt);
   }
   updateWorld(dt); updateMsg(dt);
 }
