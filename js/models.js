@@ -48,7 +48,7 @@ function part(parent, geo, mat, sx, sy, sz, x = 0, y = 0, z = 0) {
 export function makeHero() {
   const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
   const H = (hex, kind) => gmat(hex, kind, { lift: 0.55 });      // the hero is never left in the dark
-  const coat = H(0xffffff, 'coat'), cape = H(0xf2eeff, 'cape'), dark = H(0xd0c8f0, 'dark'), skin = H(0xffe6d0, 'skin');
+  const coat = gmat(0xffffff, 'coat', { lift: 0.85 }), cape = Gl(0xff5a78, 'cape'), dark = H(0xd0c8f0, 'dark'), skin = H(0xffe6d0, 'skin');
   const scarfM = Gl(0xff7fc0, 'scarf'), gold = Gl(0xffd98a, 'gold');
   const legs = [-1, 1].map(sd => {
     const l = new THREE.Group(); l.position.set(sd * 0.15, 0.8, 0); body.add(l);
@@ -524,4 +524,13 @@ export function makeArrow() {
   part(g, G.cyl, w, 0.05, 1.1, 0.05, 0, 0, 0).rotation.x = Math.PI / 2; part(g, G.cone4, Gl(0xffe066, 'gold'), 0.16, 0.34, 0.16, 0, 0, 0.68).rotation.x = Math.PI / 2;
   part(g, G.oct, w, 0.03, 0.22, 0.36, 0, 0, -0.5);
   return noShadow(g);
+}
+
+// ---------- what marks the Scribe out from everything else: a dark patch under the feet and a ring of light round it
+export function makeHeroMark() {
+  const g = new THREE.Group();
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.0, 28), new THREE.MeshBasicMaterial({ color: 0x04050a, transparent: true, opacity: 0.62, depthWrite: false }));
+  disc.rotation.x = -Math.PI / 2; disc.position.y = 0.03; g.add(disc);
+  const ring = part(g, G.ring, Gl(0xfff1c9, 'gold', { side: THREE.DoubleSide }), 1.12, 1.12, 1.12, 0, 0.05, 0); ring.rotation.x = -Math.PI / 2;
+  g.userData.ring = ring; return noShadow(g);
 }

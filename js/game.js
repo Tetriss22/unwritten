@@ -123,7 +123,7 @@ function loadWorld() {
   W.npcs = B.npcs.map(n => { const g = M.makeNPC(n.hue); place(g, n.x, n.y); R.root.add(g); return { ...n, g, ph: rnd(6) }; });
   W.drops = []; W.firstDrop = false; W.arrows = []; W.fires = new Map(); W.burnt = new Set(); W.fireDirty = false; P.mats = { dust: 0, ess: 0 }; P.owned = {}; P.perm = { ink: 0 }; P.gear = { robe: null, ring: null, charm: null }; P.bag = []; P.st = null; W.fire = null; W.said = {}; W.fireballs = []; W.burns = []; W.bolts = []; W.skybolts = []; spawnElixirs(); spawnCaches(); spawnWild();
   if (!P.m) P.m = M.makeHero();
-  R.root.add(P.m.g); P.m.g.visible = true; tintRobe();
+  R.root.add(P.m.g); P.m.g.visible = true; tintRobe(); P.mark = M.makeHeroMark(); R.root.add(P.mark);
   P.lvl = 1; P.xp = 0; applyLevel(); P.ink = P.maxInk; setWeapon(0);
   Object.assign(P, { x: B.start.x, y: B.start.y, vx: 0, vy: 0, kx: 0, ky: 0, face: 0, hp: P.maxHp, inv: 0, dashT: 0, atkT: 0, cx: B.start.x, cy: B.start.y, h: 0, hTo: 0, up: null, mounted: false });
   S.camX = P.x; S.camY = P.y; S.land = 0;
@@ -914,6 +914,7 @@ function updatePlayer(dt) {
 function poseHero(dt) {
   const p = P, m = p.m, play = S.mode === 'play', speed = play ? Math.hypot(p.vx, p.vy) : 0;
   place(m.g, p.x, p.y, p.h + (p.mounted ? 0.82 : 0)); m.g.rotation.y = rotY(p.face);
+  if (p.mark) { place(p.mark, p.x, p.y, 0); p.mark.visible = m.g.visible && !p.up; p.mark.userData.ring.scale.setScalar((p.mounted ? 1.5 : 1.12) + Math.sin(S.t * 3) * 0.04); }
   m.legs[0].visible = m.legs[1].visible = !p.mounted;
   const cf = Math.cos(p.face), sf = Math.sin(p.face);
   const wvx = play ? p.vx + p.kx : 0, wvy = play ? p.vy + p.ky : 0;
