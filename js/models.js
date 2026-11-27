@@ -441,6 +441,62 @@ export function makeProp(p) {
       add(G.box, w, 0.7, 0.7, 0.7, 0, 0.35, 0).rotation.y = v; add(G.box, w, 0.6, 0.6, 0.6, 0.75, 0.3, 0.2).rotation.y = v * 2; add(G.box, w, 0.55, 0.55, 0.55, 0.2, 0.98, 0.05).rotation.y = v * 3;
       add(G.cyl, L(0xc8a878, 'wood'), 0.56, 0.8, 0.56, -0.7, 0.4, 0.3); break;
     }
+    // things the new places are built from; every one of them breaks
+    case 'barrel': {
+      const w = L(0xd8b088, 'wood', true), band = L(0xb8bcd0, 'metal');
+      add(G.cyl, w, 0.62, 0.9, 0.62, 0, 0.45, 0); add(G.cyl, band, 0.66, 0.07, 0.66, 0, 0.18, 0); add(G.cyl, band, 0.66, 0.07, 0.66, 0, 0.72, 0);
+      if (v > 0.6) add(G.cyl, w, 0.62, 0.9, 0.62, 0, 0.36, 0.62).rotation.x = Math.PI / 2;
+      break;
+    }
+    case 'keg': {     // blasting powder: red, banded, a fuse on top. Fire or a hard hit sets it off
+      const w = L(0xff5a4a, 'wood', true), band = L(0x403040, 'metal');
+      add(G.cyl, w, 0.62, 0.82, 0.62, 0, 0.41, 0); add(G.cyl, band, 0.66, 0.07, 0.66, 0, 0.14, 0); add(G.cyl, band, 0.66, 0.07, 0.66, 0, 0.68, 0);
+      add(G.box, Gl(0xffe066, 'gold'), 0.3, 0.3, 0.05, 0, 0.42, 0.31).rotation.z = 0.785;
+      add(G.cyl, Gl(0xffb050, 'fire'), 0.05, 0.26, 0.05, 0.12, 0.92, 0).rotation.z = 0.4;
+      break;
+    }
+    case 'logs': {
+      const w = L(0xc89a6a, 'trunk', true), cut = L(0xffe0b0, 'wood', true);
+      for (const [x, y] of [[-0.68, 0.34], [0, 0.34], [0.68, 0.34], [-0.34, 0.92], [0.34, 0.92], [0, 1.5]]) {
+        add(G.cyl, w, 0.66, 2.3, 0.66, x, y, 0).rotation.x = Math.PI / 2;
+        add(G.cyl, cut, 0.58, 0.04, 0.58, x, y, 1.16).rotation.x = Math.PI / 2;
+      }
+      g.rotation.y = p.rot; break;
+    }
+    case 'shack': {
+      const w = L(0xd8b888, 'wood', true), dk = L(0x9a7a58, 'wood', true), roof = L(0xc8a070, 'roof', true);
+      add(G.box, w, 2.6, 1.7, 0.16, 0, 0.85, -0.85); add(G.box, w, 0.16, 1.7, 1.7, -1.22, 0.85, 0); add(G.box, w, 0.16, 1.7, 1.7, 1.22, 0.85, 0);
+      add(G.box, w, 0.9, 1.7, 0.16, -0.85, 0.85, 0.85); add(G.box, w, 0.9, 1.7, 0.16, 0.85, 0.85, 0.85); add(G.box, w, 0.8, 0.4, 0.16, 0, 1.5, 0.85);
+      add(G.box, dk, 0.1, 1.9, 0.1, -1.25, 0.95, 0.88); add(G.box, dk, 0.1, 1.9, 0.1, 1.25, 0.95, 0.88);
+      const r1 = add(G.box, roof, 2.9, 0.12, 2.3, 0, 1.95, 0); r1.rotation.x = -0.22;
+      add(G.box, Gl(0xffb040, 'window'), 0.36, 0.3, 0.06, -0.6, 1.1, -0.95);
+      g.rotation.y = p.rot; break;
+    }
+    case 'tent': {
+      const c = L([0xe8d8b0, 0xc8e0c0, 0xe0c0a0][Math.floor(v * 3)], 'cape', true);
+      add(G.prism, c, 2.0, 1.5, 2.4, 0, 0, 0); add(G.cyl, L(0xc8a878, 'wood'), 0.08, 1.8, 0.08, 0, 0.9, 1.25);
+      add(G.box, L(0x302830, 'cape', true), 0.6, 0.9, 0.04, 0, 0.45, 1.21);
+      g.rotation.y = p.rot; break;
+    }
+    case 'pillar': {    // a quarry stack: blocks cut and left one on another
+      const st = L(0xe0d8f0, 'stone', true), n = 3 + Math.floor(v * 2);
+      for (let k = 0; k < n; k++) { const sz = 1.15 - k * 0.08; add(G.box, st, sz, 0.78, sz * (0.9 + (k % 2) * 0.12), (k % 2 ? 0.06 : -0.04) * (v * 3 - 1), 0.39 + k * 0.8, 0).rotation.y = k * 0.35 + v; }
+      break;
+    }
+    case 'hull': {      // one third of a ship frozen in the snow, keel along x
+      const w = L(0xc8986a, 'wood', true), deck = L(0xe0c08a, 'wood', true), snowy = L(0xffffff, 'snow', true), bow = v < 0.34, stern = v > 0.67;
+      add(G.box, w, 2.2, 1.1, 0.18, 0, 0.75, -0.95); add(G.box, w, 2.2, 1.1, 0.18, 0, 0.75, 0.95); add(G.box, w, 2.2, 0.3, 1.7, 0, 0.3, 0);
+      add(G.box, deck, 2.2, 0.12, 1.9, 0, 1.25, 0); add(G.box, snowy, 1.8, 0.14, 1.5, 0.1, 1.36, 0.05);
+      if (bow) { add(G.prism, w, 1.2, 1.3, 1.9, 1.1, 0.75, 0).rotation.z = -Math.PI / 2; }
+      if (stern) { add(G.box, w, 0.3, 1.9, 2.0, -1.2, 0.95, 0); add(G.box, Gl(0xffb040, 'window'), 0.08, 0.4, 0.5, -1.37, 1.1, 0.4); }
+      g.rotation.y = p.rot; g.rotation.z = (v - 0.5) * 0.12; break;
+    }
+    case 'mast': {
+      const w = L(0xc8986a, 'trunk', true);
+      add(G.cyl, w, 0.28, 5.2, 0.28, 0, 2.6, 0); add(G.box, w, 0.14, 0.14, 2.8, 0, 4.3, 0);
+      add(G.box, L(0xf4ecdc, 'cape', true), 0.05, 2.2, 2.5, 0.12, 3.1, 0).rotation.x = 0.08;
+      g.rotation.y = p.rot; g.rotation.z = 0.12; break;
+    }
     case 'cart': {
       const w = L(0xe0c8a0, 'wood', true);
       add(G.box, w, 1.8, 0.5, 1.0, 0, 0.75, 0); add(G.box, L(0xffd9a0, 'hay', true), 1.6, 0.4, 0.85, 0, 1.15, 0);
@@ -454,6 +510,7 @@ export function makeProp(p) {
 }
 // ---------- magic and elixirs, written in the same letters as everything else
 const noShadow = (g) => { g.traverse(m => { if (m.isMesh) m.layers.set(2); }); return g; };
+export function makeBomb() { const g = new THREE.Group(); part(g, G.sph, L(0x3a3444, 'metal', true), 0.5, 0.5, 0.5); part(g, G.cyl, L(0xb8bcd0, 'metal'), 0.2, 0.1, 0.2, 0, 0.26, 0); part(g, G.sph, Gl(0xffd060, 'fire'), 0.12, 0.12, 0.12, 0, 0.36, 0); return noShadow(g); }
 export function makeFireball() { const g = new THREE.Group(); part(g, G.sph, Gl(0xff7a2a, 'fire'), 0.75, 0.75, 0.75); part(g, G.oct, Gl(0xffe9a8, 'fire'), 0.42, 0.42, 0.42); return noShadow(g); }
 export function makeSkyBolt() {
   const g = new THREE.Group(); let x = 0, z = 0;

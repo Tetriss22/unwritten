@@ -18,6 +18,7 @@ Something is deleting the world one word at a time. You are the last Scribe. The
 | Call your horse / get down | R | HORSE |
 | Climb a tower, climb down, talk | E | USE |
 | Light a campfire (checkpoint, heals you) | F | FIRE |
+| Throw a bomb | G or 3 | BOMB |
 | Zoom | mouse wheel, + and - | pinch, or the + and - buttons |
 | Whole-world map | Z, or the MAP button | MAP |
 | Sound / pause | M / Esc | buttons, top right |
@@ -41,6 +42,31 @@ Makers work for **dust** (from kills and from salvaging gear) and **essence** (f
 - **Smiths** make five weapons: **SWORD** (twice the quill), **SABRE** (fast, wide, +20% crit), **PIKE** (double reach, pierces a line), **BOW** (arrows pass through two and can be shot from tower tops) and **HAMMER** (slow, hits everything near the impact). There is a smith in the first village.
 - **Outfitters** make magic, rare and legendary gear, and reforge the stats of what you wear.
 - **Alchemists** sell a mending draught, a draught of experience and Deep ink (+10 max ink for good, five times).
+
+Breaking things gives a third material, **scrap**, and the makers have new work for it:
+
+- **Smiths** temper any weapon you can use: +25% damage per temper, three times each.
+- **Outfitters** sew a bigger satchel: +8 bag places, twice.
+- **Alchemists** make **ink bombs** (three at a time, carry nine) and a **powder flask** that makes your next three fireballs burst like bombs.
+
+## Everything breaks
+
+Crates, barrels, carts, fences, hay, log piles, tents, shacks, shelves, library walls, stone columns, quarry stacks, brick walls and a whole ship come apart when hit hard enough. Each one is cut into pieces along its own parts, and every piece is a small rigid body (`js/wreck.js`): gravity, bounce, friction, spin, tipping over onto its biggest face, piling up on other pieces, being kicked aside by whoever walks through, and hurting monsters it hits at speed. Tall things lean the way they were pushed and topple. The pieces stay where they land for a while, then sink into the page.
+
+- Every weapon breaks things; the hammer and the blade hit them harder, arrows chip them, a galloping horse goes straight through fences and crates, and charging Brutes smash whatever is in their way.
+- Fire spreads from one wooden thing to the next and burns it down to charred pieces. Burning wheat takes the hay bales and carts standing in it.
+- **Red kegs** are blasting powder. Fire or a hard hit lights a short fuse; one keg sets off the next.
+- What is broken stays broken in your save.
+
+## New places off the roads
+
+Five places sit out in the wilds, each on its own ground, with a chest, a guard led by an Elder, and things made to be broken. The map shows a **?** until you find them.
+
+- **The Lumber Yard** (the Margin): a shack, log piles, crates and a fence.
+- **Smugglers' Camp** (the Drowned Shelves): tents, barrels and a stack of red kegs.
+- **The Quarry** (Cinder Row): a ring of cut stone stacks, columns and powder kegs.
+- **The Frozen Wreck** (Whiteout Pass): a ship frozen in the snow, mast and cargo still aboard.
+- **The Fallen Archive** (the Blank): the last library walls and shelves.
 
 ## Wheat burns
 

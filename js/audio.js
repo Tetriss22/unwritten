@@ -75,6 +75,14 @@ export class Audio {
       case 'whistle': this.tone('sine', 1300, 2100, 0.16, 0.2); this.tone('sine', 1500, 2500, 0.22, 0.2, 0.2); break;
       case 'hoof': this.noise(0.05, 500, 180, 0.12, 1.2); break;
       case 'fire': this.noise(0.5, 300, 2400, 0.25, 0.8); this.tone('triangle', 220, 440, 0.4, 0.1); break;
+      // things breaking
+      case 'knock': this.tone('square', 180, 120, 0.06, 0.12); this.noise(0.07, 900, 400, 0.22, 2); break;
+      case 'chip': this.noise(0.08, 3200, 1400, 0.22, 3); this.tone('triangle', 900, 600, 0.05, 0.06); break;
+      case 'crack': for (let i = 0; i < 4; i++) this.noise(0.09, 1400 - i * 200, 300, 0.3 - i * 0.05, 2.2, i * 0.035); this.tone('square', 140, 50, 0.22, 0.18); if (a) this.noise(0.5, 600, 90, 0.3, 0.7, 0.05); break;
+      case 'crumble': this.tone('sine', 90, 30, 0.5, 0.45); for (let i = 0; i < 6; i++) this.noise(0.12, 2400 - i * 250, 500, 0.24, 1.5, i * 0.05); if (a) this.noise(0.9, 400, 60, 0.4, 0.6, 0.08); break;
+      case 'boom': this.tone('sine', 80, 22, 1.1, 0.75); this.noise(1.0, 1800, 60, 0.65, 0.5); this.noise(0.25, 5000, 800, 0.35, 0.8); this.tone('sawtooth', 120, 30, 0.5, 0.2, 0.02); break;
+      case 'thud': this.tone('sine', 120 + Math.random() * 60, 45, 0.12, 0.12 * (0.4 + a)); this.noise(0.06, 700, 200, 0.08 * (0.4 + a), 1.5); break;
+      case 'clack': this.noise(0.04, 2600 + Math.random() * 1600, 1500, 0.07 * (0.4 + a), 4); break;
       case 'ice': this.noise(0.6, 4200, 900, 0.3, 4); this.tone('sine', 1800, 500, 0.5, 0.08); break;
     }
   }

@@ -51,11 +51,13 @@ export class Terrain {
     for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (this.isSolid(x + Math.cos(a) * r, y + Math.sin(a) * r)) return true; }
     return false;
   }
-  solidCircle(x, y, r) {
+  // out, when given, collects the cells this call made solid, so a thing that breaks can give them back
+  solidCircle(x, y, r, out) {
     const c0x = Math.floor((x - r) * CPU), c1x = Math.floor((x + r) * CPU), c0y = Math.floor((y - r) * CPU), c1y = Math.floor((y + r) * CPU);
     for (let cy = c0y; cy <= c1y; cy++) for (let cx = c0x; cx <= c1x; cx++) {
       if (cx < 0 || cy < 0 || cx >= this.w || cy >= this.h) continue;
-      if (Math.hypot((cx + 0.5) / CPU - x, (cy + 0.5) / CPU - y) <= r) this.solid[cy * this.w + cx] = 1;
+      const i = cy * this.w + cx;
+      if (Math.hypot((cx + 0.5) / CPU - x, (cy + 0.5) / CPU - y) <= r) { if (out && !this.solid[i]) out.push(i); this.solid[i] = 1; }
     }
   }
 }
@@ -446,8 +448,8 @@ export function buildWorld() {
     if (T.blocked(x, y, 0.5) || Math.hypot(x - AR.x, y - AR.y) < AR.r + 0.5) continue;
     const inField = T.regAt(x, y) === 0 && nodes.some(n => n.field && Math.hypot(x - n.x, y - n.y) < n.r - 0.8);
     const type = inField ? 'hay' : pick(P.inner), big = type === 'shelf' || type === 'boulder' || type === 'column' || type === 'hay';
-    props.push({ type, x, y, s: 0.75 + R() * 0.45, rot: R() * 6.28, v: R() });
-    T.solidCircle(x, y, big ? 0.5 : 0.36);
+    const cells = []; props.push({ type, x, y, s: 0.75 + R() * 0.45, rot: R() * 6.28, v: R(), cells });
+    T.solidCircle(x, y, big ? 0.5 : 0.36, cells);
   }
   const far = (x, y, min) => lamps.every(p => Math.hypot(p.x - x, p.y - y) > min);
   const addLamp = (x, y) => {
@@ -511,10 +513,10 @@ export function buildWorld() {
   const HARD = { stall: 0.9, tree: 0.32, cypress: 0.32, pine: 0.34, deadtree: 0.28, tower: 1.0, watchtower: 0.95, windmill: 1.3, burnt: 1.5, well: 0.75, crates: 0.7, cart: 0.85, hay: 0.55, boulder: 0.7, column: 0.4, shelf: 0.6, wall: 0.7, stone: 0.3 };
   const towers = [];
   for (const p of props) {
-    const r = HARD[p.type];
-    if (r) T.solidCircle(p.x, p.y, r * p.s);
+    const r = HARD[p.type], out = p.cells || (p.cells = []);
+    if (r) T.solidCircle(p.x, p.y, r * p.s, out);
     else if (p.type === 'house' || p.type === 'cabin') for (const o of [-0.8, 0.8]) T.solidCircle(p.x + Math.cos(p.rot) * o * p.s, p.y - Math.sin(p.rot) * o * p.s, 1.2 * p.s);
-    else if (p.type === 'ruinwall') for (const o of [-1.9, -0.63, 0.63, 1.9]) T.solidCircle(p.x + Math.cos(p.rot) * o * p.s, p.y - Math.sin(p.rot) * o * p.s, 0.55 * p.s);
+    else if (p.type === 'ruinwall') for (const o of [-1.9, -0.63, 0.63, 1.9]) T.solidCircle(p.x + Math.cos(p.rot) * o * p.s, p.y - Math.sin(p.rot) * o * p.s, 0.55 * p.s, out);
     if (p.type === 'tower') towers.push({ x: p.x, y: p.y, top: (3.8 + p.v * 1.4 + 0.3) * p.s, rad: 0.72 * p.s, base: 1.0 * p.s });
     if (p.type === 'watchtower') towers.push({ x: p.x, y: p.y, top: (3.8 + p.v * 1.4 + 0.1) * p.s, rad: 0.6 * p.s, base: 0.95 * p.s });
   }
@@ -540,6 +542,17 @@ export function buildWorld() {
     },
     paintGate(g, cx, cy) { const L = LANDS[g.land]; paint(T, cx, cy, L.mats.bridge, L.seed, g.land, g.tid); const i = cy * T.w + cx; T.solid[i] = 0; T.tag[i] = 0; T.data[i * 4 + 3] |= 128; },
     coolHazard() { const L = LANDS[2]; for (const [cx, cy] of hazard) { paint(T, cx, cy, L.mats.cooled, L.seed, 2); T.tag[cy * T.w + cx] = 0; T.data[(cy * T.w + cx) * 4 + 3] |= 128; } },
+    // the ground of a place found off the roads: sawdust, mud, gravel, ice, loose pages
+    paintSite(x, y, r, land, style) {
+      const M = { saw: { bands: [".,'`", "-.,'", ",`.-"], pal: [10, 11, 3], bri: [0.32, 0.7] }, mud: { bands: ['~.,', ',~.', '.,~'], pal: [3, 10, 4], bri: [0.28, 0.58] }, gravel: { ramp: STONE, pal: [3], bri: [0.3, 0.95], scale: 2.5 }, ice: { bands: ['-=', '=-~', '_-'], pal: [6, 5, 3], bri: [0.55, 1.05] }, paper: { bands: ['=-_', '_=-', '-_='], pal: [3, 11], bri: [0.38, 0.78] } }[style];
+      const c0x = Math.floor((x - r - 1) * CPU), c1x = Math.ceil((x + r + 1) * CPU), c0y = Math.floor((y - r - 1) * CPU), c1y = Math.ceil((y + r + 1) * CPU);
+      for (let cy = c0y; cy <= c1y; cy++) for (let cx = c0x; cx <= c1x; cx++) {
+        if (cx < 0 || cy < 0 || cx >= T.w || cy >= T.h) continue;
+        const i = cy * T.w + cx, ux = (cx + 0.5) / CPU, uy = (cy + 0.5) / CPU, d = Math.hypot(ux - x, uy - y) / (r * (0.8 + 0.4 * fbm(ux * 0.9, uy * 0.9, 61)));
+        if (d > 1 || T.solid[i] || T.reg[i] !== land || (d > 0.8 && h2(cx, cy, 62) < (d - 0.8) * 5)) continue;
+        const keep = T.data[i * 4 + 3] & 128; paint(T, cx, cy, M, LANDS[land].seed + 7, land); T.data[i * 4 + 3] |= keep;
+      }
+    },
     // a lit lantern makes its whole land easier to read
     brighten(land) { const d = T.data, r = T.reg; for (let i = 0; i < r.length; i++) if (r[i] === land) d[i * 4 + 2] = Math.min(255, d[i * 4 + 2] * 1.5 + 12); },
   };
