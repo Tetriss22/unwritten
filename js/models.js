@@ -161,8 +161,59 @@ export function makeNPC(k) {
   else if (k % 3 === 1) { part(g, G.cyl, hat, 0.5, 0.2, 0.5, 0, 2.2, 0); part(g, G.box, hat, 0.3, 0.05, 0.3, 0, 2.14, 0.3); }
   else part(g, G.sph, hat, 0.5, 0.46, 0.5, 0, 2.02, -0.06);
   part(g, G.sph, Gl(0x201830, 'eye'), 0.07, 0.07, 0.05, -0.09, 1.96, 0.21); part(g, G.sph, Gl(0x201830, 'eye'), 0.07, 0.07, 0.05, 0.09, 1.96, 0.21);
+  // arms on shoulder pivots, so townsfolk can wave, carry, chop and plough; the right hand holds a tool
+  const arm = (sd) => { const a = new THREE.Group(); a.position.set(sd * 0.4, 1.58, 0.02); g.add(a); part(a, G.cyl, shawl, 0.17, 0.62, 0.17, 0, -0.3, 0); part(a, G.sph, skin, 0.16, 0.16, 0.16, 0, -0.64, 0); return a; };
+  const armL = arm(-1), armR = arm(1), hand = new THREE.Group(); hand.position.set(0, -0.66, 0); armR.add(hand);
+  g.userData = { armL, armR, hand };
   return g;
 }
+// what townsfolk work with; each is held in the right hand, pointing along the forearm
+export function makeTool(kind) {
+  const g = new THREE.Group(), wood = L(0xc8a070, 'wood'), metal = L(0xd8dcf0, 'metal');
+  switch (kind) {
+    case 'cleaver': part(g, G.cyl, wood, 0.07, 0.3, 0.07, 0, 0, 0.05).rotation.x = Math.PI / 2; part(g, G.box, metal, 0.05, 0.28, 0.36, 0, -0.1, 0.32); break;
+    case 'axe': part(g, G.cyl, wood, 0.07, 1.1, 0.07, 0, -0.1, 0.35).rotation.x = Math.PI / 2; part(g, G.box, metal, 0.06, 0.3, 0.26, 0, -0.12, 0.85); break;
+    case 'hammer': part(g, G.cyl, wood, 0.07, 0.6, 0.07, 0, 0, 0.2).rotation.x = Math.PI / 2; part(g, G.box, L(0x8a8ea8, 'metal'), 0.16, 0.16, 0.3, 0, 0, 0.5).rotation.x = Math.PI / 2; break;
+    case 'broom': part(g, G.cyl, wood, 0.06, 1.6, 0.06, 0, -0.45, 0.2).rotation.x = 0.6; part(g, G.cone, L(0xffd9a0, 'hay', true), 0.4, 0.5, 0.2, 0, -1.2, 0.68).rotation.x = Math.PI + 0.6; break;
+    case 'bucket': part(g, G.frust, L(0xb8bcd0, 'metal', true), 0.42, 0.4, 0.42, 0, -0.32, 0).rotation.x = Math.PI; part(g, G.disc, L(0x5a8aff, 'ice'), 0.36, 1, 0.36, 0, -0.14, 0); part(g, G.torThin, metal, 0.42, 0.42, 1, 0, -0.1, 0); break;
+    case 'hoe': part(g, G.cyl, wood, 0.06, 1.5, 0.06, 0, -0.3, 0.3).rotation.x = 1.0; part(g, G.box, metal, 0.3, 0.05, 0.2, 0, -0.92, 0.95); break;
+    case 'needle': part(g, G.cyl, metal, 0.03, 0.3, 0.03, 0, -0.1, 0.1).rotation.x = 1.2; part(g, G.box, L(0xff8fc8, 'cape', true), 0.3, 0.02, 0.3, 0, -0.2, 0.3); break;
+    case 'spoon': part(g, G.cyl, wood, 0.05, 0.9, 0.05, 0, -0.35, 0.1).rotation.x = 0.3; break;
+    case 'meat': part(g, G.sph, L(0xff8a8a, 'cape', true), 0.36, 0.26, 0.3, 0, -0.12, 0.12); break;
+  }
+  return noShadow(g);
+}
+// the butcher's block, the woodcutter's stump, the smith's anvil, a kettle on a fire
+export function makeWorkspot(kind) {
+  const g = new THREE.Group(), wood = L(0xc89a6a, 'wood', true);
+  if (kind === 'block') { part(g, G.cyl, wood, 0.9, 0.8, 0.9, 0, 0.4, 0); part(g, G.box, L(0xff8a8a, 'cape', true), 0.55, 0.12, 0.38, 0.05, 0.86, 0); part(g, G.box, L(0xffe0e0, 'skin', true), 0.18, 0.13, 0.36, -0.2, 0.87, 0); part(g, G.box, wood, 0.9, 1.0, 0.1, 0, 0.5, -0.9); for (const x of [-0.3, 0, 0.3]) part(g, G.sph, L(0xff7a7a, 'cape', true), 0.22, 0.32, 0.18, x, 0.85, -0.85); }
+  if (kind === 'stump') { part(g, G.cyl, wood, 0.95, 0.5, 0.95, 0, 0.25, 0); part(g, G.cyl, L(0xffe0b0, 'wood', true), 0.85, 0.02, 0.85, 0, 0.51, 0); for (let i = 0; i < 5; i++) part(g, G.cyl, wood, 0.32, 0.9, 0.32, -0.9 + (i % 3) * 0.32, 0.18 + Math.floor(i / 3) * 0.28, -0.7 + (i % 2) * 0.1).rotation.z = Math.PI / 2; }
+  if (kind === 'log') part(g, G.cyl, L(0xc89a6a, 'trunk', true), 0.42, 0.7, 0.42, 0, 0.35, 0);
+  if (kind === 'anvil') { part(g, G.box, L(0x8a8ea8, 'metal', true), 0.36, 0.42, 0.3, 0, 0.21, 0); part(g, G.box, L(0x9aa0b8, 'metal', true), 0.7, 0.18, 0.34, 0.05, 0.5, 0); part(g, G.cone4, L(0x9aa0b8, 'metal', true), 0.2, 0.3, 0.2, 0.48, 0.5, 0).rotation.z = -Math.PI / 2; }
+  if (kind === 'kettle') { part(g, G.sph, L(0x403848, 'metal', true), 0.7, 0.55, 0.7, 0, 0.45, 0); for (let i = 0; i < 3; i++) part(g, G.cyl, wood, 0.08, 1.4, 0.08, Math.cos(i * 2.1) * 0.5, 0.6, Math.sin(i * 2.1) * 0.5).rotation.set(Math.sin(i * 2.1) * 0.4, 0, -Math.cos(i * 2.1) * 0.4); const f = part(g, G.cone, Gl(0xff8a2a, 'fire'), 0.4, 0.5, 0.4, 0, 0.2, 0); f.userData.flame = true; }
+  return g;
+}
+// a paper ox and the plough behind it
+export function makeOx() {
+  const g = new THREE.Group(), hide = gmat(0xf0e4d0, 'cape', { lift: 0.3 }), dark = gmat(0x8a6a50, 'leather', { lift: 0.3 }), horn = L(0xfff1c9, 'stone');
+  const body = new THREE.Group(); g.add(body);
+  part(body, G.box, hide, 0.9, 0.8, 1.7, 0, 1.0, 0); part(body, G.box, dark, 0.92, 0.3, 0.6, 0, 1.25, -0.2);
+  const head = new THREE.Group(); head.position.set(0, 1.15, 0.95); body.add(head);
+  part(head, G.box, hide, 0.55, 0.5, 0.6, 0, 0, 0.2); part(head, G.box, dark, 0.4, 0.25, 0.2, 0, -0.12, 0.52);
+  for (const sd of [-1, 1]) part(head, G.cone, horn, 0.1, 0.4, 0.1, sd * 0.38, 0.25, 0.1).rotation.z = -sd * 1.1;
+  part(head, G.sph, Gl(0x201830, 'eye'), 0.08, 0.08, 0.05, -0.18, 0.08, 0.5); part(head, G.sph, Gl(0x201830, 'eye'), 0.08, 0.08, 0.05, 0.18, 0.08, 0.5);
+  const legs = [];
+  for (const [x, z] of [[-0.3, 0.6], [0.3, 0.6], [-0.3, -0.6], [0.3, -0.6]]) { const l = new THREE.Group(); l.position.set(x, 0.65, z); body.add(l); part(l, G.cyl, dark, 0.2, 0.65, 0.2, 0, -0.32, 0); legs.push(l); }
+  part(body, G.cyl, dark, 0.06, 0.6, 0.06, 0, 1.0, -0.98).rotation.x = 0.6;
+  // yoke and plough, trailing behind
+  const plough = new THREE.Group(); plough.position.set(0, 0, -1.9); g.add(plough);
+  part(plough, G.box, L(0xc8a070, 'wood'), 0.1, 0.1, 1.6, 0, 0.55, 0.55).rotation.x = -0.3;
+  part(plough, G.cone4, L(0xd8dcf0, 'metal', true), 0.32, 0.5, 0.2, 0, 0.2, -0.1).rotation.x = -Math.PI / 2;
+  for (const sd of [-1, 1]) part(plough, G.box, L(0xc8a070, 'wood'), 0.06, 0.06, 0.9, sd * 0.25, 0.75, -0.45).rotation.x = 0.5;
+  g.userData = { body, head, legs, plough };
+  return g;
+}
+
 export function makeCampfire() {
   const g = new THREE.Group(), w = L(0xd0a878, 'wood', true);
   for (let i = 0; i < 4; i++) { const m = part(g, G.box, w, 0.16, 0.16, 1.0, 0, 0.12, 0); m.rotation.y = i * 0.8; }

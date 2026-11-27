@@ -399,12 +399,12 @@ export function buildWorld() {
     const build = LANDS[n.land].props.build;
     if (n.field || /g[AB]$|^s[AB]$|^eA$|^AR$/.test(n.id)) continue;
     for (let k = 0; k < (n.town ? 9 : n.r > 2.4 ? 3 : 2); k++) for (let tries = 0; tries < 14; tries++) {
-      const ang = n.town ? R() * 6.283 : backA + (R() - 0.5) * 3.4, d = n.r + 2.2 + R() * (n.town ? 4.6 : 3.4), x = n.x + Math.cos(ang) * d, y = n.y + Math.sin(ang) * d;
-      if (x < 3 || y < 3 || x > wu - 3 || y > hu - 3 || walk(x, y) < 1.8 || stripAt(x, y, 2.2) || hides(x, y)) continue;
-      if (sites.some(q => Math.hypot(q.x - x, q.y - y) < 3.9)) continue;
+      const ang = n.town ? R() * 6.283 : backA + (R() - 0.5) * 3.4, d = n.r + 2.7 + R() * (n.town ? 4.8 : 3.6), x = n.x + Math.cos(ang) * d, y = n.y + Math.sin(ang) * d;
+      if (x < 3 || y < 3 || x > wu - 3 || y > hu - 3 || walk(x, y) < 2.3 || stripAt(x, y, 2.6) || hides(x, y)) continue;
+      if (sites.some(q => Math.hypot(q.x - x, q.y - y) < 4.7)) continue;
       const type = n.town ? (n.land === 3 ? 'cabin' : k === 8 && n.land === 0 ? 'windmill' : 'house') : pick(build), face = Math.atan2(n.x - x, n.y - y);
       sites.push({ x, y }); props.push({ type, x, y, s: 0.95 + R() * 0.25, rot: face + (R() - 0.5) * 0.5, v: R(), build: true });
-      lamps.push({ x: x + Math.sin(face) * 1.8, y: y + Math.cos(face) * 1.8, r: 3.4, col: LANDS[n.land].props.lampCol, int: 0.7, ph: R() * 6 });
+      lamps.push({ x: x + Math.sin(face) * 2.4, y: y + Math.cos(face) * 2.4, r: 3.4, col: LANDS[n.land].props.lampCol, int: 0.7, ph: R() * 6 });
       break;
     }
   }
@@ -511,14 +511,17 @@ export function buildWorld() {
   }
   // what you cannot walk through
   const HARD = { stall: 0.9, tree: 0.32, cypress: 0.32, pine: 0.34, deadtree: 0.28, tower: 1.0, watchtower: 0.95, windmill: 1.3, burnt: 1.5, well: 0.75, crates: 0.7, cart: 0.85, hay: 0.55, boulder: 0.7, column: 0.4, shelf: 0.6, wall: 0.7, stone: 0.3 };
+  // buildings are built bigger than the Scribe: wider, and taller still (hs stretches only the height)
+  const GROW = { house: [1.22, 1.55], cabin: [1.22, 1.55], burnt: [1.2, 1.4], tower: [1.28, 1.65], watchtower: [1.28, 1.6], windmill: [1.3, 1.3] };
+  for (const p of props) { const g = GROW[p.type]; if (g) { p.s *= g[0]; p.hs = g[1] / g[0]; } }
   const towers = [];
   for (const p of props) {
     const r = HARD[p.type], out = p.cells || (p.cells = []);
     if (r) T.solidCircle(p.x, p.y, r * p.s, out);
     else if (p.type === 'house' || p.type === 'cabin') for (const o of [-0.8, 0.8]) T.solidCircle(p.x + Math.cos(p.rot) * o * p.s, p.y - Math.sin(p.rot) * o * p.s, 1.2 * p.s);
     else if (p.type === 'ruinwall') for (const o of [-1.9, -0.63, 0.63, 1.9]) T.solidCircle(p.x + Math.cos(p.rot) * o * p.s, p.y - Math.sin(p.rot) * o * p.s, 0.55 * p.s, out);
-    if (p.type === 'tower') towers.push({ x: p.x, y: p.y, top: (3.8 + p.v * 1.4 + 0.3) * p.s, rad: 0.72 * p.s, base: 1.0 * p.s });
-    if (p.type === 'watchtower') towers.push({ x: p.x, y: p.y, top: (3.8 + p.v * 1.4 + 0.1) * p.s, rad: 0.6 * p.s, base: 0.95 * p.s });
+    if (p.type === 'tower') towers.push({ x: p.x, y: p.y, top: (3.8 + p.v * 1.4 + 0.3) * p.s * p.hs, rad: 0.72 * p.s, base: 1.0 * p.s });
+    if (p.type === 'watchtower') towers.push({ x: p.x, y: p.y, top: (3.8 + p.v * 1.4 + 0.1) * p.s * p.hs, rad: 0.6 * p.s, base: 0.95 * p.s });
   }
   const npcs = PEOPLE.map(([id, dx, dy, name, line, shop], k) => ({ x: makerAt[k] ? makerAt[k][0] : N[id].x + dx, y: makerAt[k] ? makerAt[k][1] : N[id].y + dy, name, line, shop, hue: k }));
 

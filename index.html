@@ -20,16 +20,22 @@ body { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; fon
 .layer { position: fixed; inset: 0; pointer-events: none; }
 #hud { padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); opacity: 0; transition: opacity .6s; }
 #hud.on { opacity: 1; }
-#panel { display: inline-block; min-width: 230px; padding: 8px 12px 10px; background: rgba(4,5,10,.82); border: 1px solid #c8c4e0; }
+#panel { display: inline-block; min-width: 230px; padding: 2px 4px; text-shadow: 0 0 3px #000, 0 0 8px #000, 0 0 14px rgba(0,0,0,.9); }
 #panel b { font-weight: 800; color: var(--dim); font-size: 11px; letter-spacing: .14em; margin-right: 6px; }
 #chapter { font-size: 12px; font-weight: 800; letter-spacing: .1em; color: #fff; }
-#hearts { margin-top: 6px; font-size: 15px; letter-spacing: .02em; color: #fff; white-space: nowrap; }
-#hearts i, #ink i, #lv i { font-style: normal; color: #4a4668; }
-#ink, #lv { margin-top: 3px; font-size: 12px; white-space: nowrap; }
+#hearts { margin-top: 4px; font-size: 22px; line-height: 1; letter-spacing: .04em; color: #fff; white-space: nowrap; }
+#hearts .h { color: #ff4d6d; text-shadow: 0 0 6px rgba(255,50,90,.75), 0 0 2px #000; } #hearts .h.e { color: #3c3850; text-shadow: 0 0 2px #000; } #hearts .h.lost { animation: hlost .5s; }
+@keyframes hlost { 0% { transform: scale(1.6); color: #fff; } 100% { transform: scale(1); } } #hearts .h { display: inline-block; }
+.bar { display: inline-block; position: relative; width: 150px; height: 9px; margin-right: 6px; vertical-align: middle; border-radius: 5px; background: rgba(10,10,24,.55); box-shadow: 0 0 0 1px rgba(255,255,255,.28), 0 0 8px rgba(0,0,0,.8); overflow: hidden; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; transition: width .25s; }
+#ink .bar i { background: linear-gradient(90deg, #2f6cff, #8fd6ff); box-shadow: 0 0 8px #4a9aff; } #lv .bar i { background: linear-gradient(90deg, #d89a2a, #ffe9a8); box-shadow: 0 0 8px #ffc860; }
+#ink b, #lv b { display: inline-block; min-width: 42px; }
+
+#ink, #lv { margin-top: 5px; font-size: 12px; white-space: nowrap; }
 #ink { color: #7fc0ff; } #lv { color: var(--gold); }
 #ink small, #lv small { font-size: 10px; color: var(--dim); margin-left: 4px; }
 #slots { margin-top: 7px; display: flex; gap: 5px; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
-#slots span { border: 1px solid #c8c4e0; padding: 2px 5px; color: #fff; }
+#slots span { border: 1px solid rgba(200,196,224,.7); border-radius: 3px; padding: 2px 5px; color: #fff; background: rgba(8,8,20,.35); }
 #slots span.off { color: #55516f; border-color: #3a3860; }
 .ft.lvl { font-size: 30px; color: var(--gold); letter-spacing: .2em; }
 .ft.ink { color: #7fc0ff; font-size: 18px; }
@@ -37,6 +43,9 @@ body { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; fon
 #hearts small { font-size: 11px; color: var(--dim); margin-left: 4px; }
 #word { margin-top: 5px; font-size: 16px; font-weight: 800; letter-spacing: .3em; color: var(--gold); white-space: nowrap; }
 #word i { font-style: normal; color: #4a4668; }
+.say { position: absolute; left: 0; top: 0; max-width: 220px; padding: 3px 8px; border-radius: 9px; background: rgba(255,248,230,.93); color: #1a1626; font-size: 11px; font-weight: 800; line-height: 1.25; text-align: center; white-space: normal; will-change: transform; display: none; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+.say::after { content: ''; position: absolute; left: 50%; bottom: -5px; margin-left: -5px; border: 5px solid transparent; border-bottom: 0; border-top-color: rgba(255,248,230,.93); }
+.say.yell { background: #ffe066; } .say.fear { background: #ffb0b8; }
 .lab { position: absolute; left: 0; top: 0; font-size: 11px; font-weight: 800; letter-spacing: .04em; color: #fff; text-align: center; text-shadow: 0 0 4px #000, 0 0 2px #000; white-space: nowrap; will-change: transform; display: none; }
 .lab i { display: block; width: 38px; height: 4px; margin: 2px auto 0; background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.55); }
 .lab b { display: block; height: 100%; background: #ff3a5a; }
@@ -154,7 +163,7 @@ body.cap #card, body.cap #msg, body.cap #hint, body.cap #tools, body.cap #arrow,
 @media (max-width: 560px) {
   #panel { min-width: 0; max-width: 56vw; padding: 6px 8px 8px; }
   #chapter { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #hearts { font-size: 13px; } #ink, #lv { font-size: 10px; } #word { font-size: 13px; letter-spacing: .2em; } #lanterns { font-size: 11px; }
+  #hearts { font-size: 17px; } #ink, #lv { font-size: 10px; } .bar { width: 96px; height: 7px; } #word { font-size: 13px; letter-spacing: .2em; } #lanterns { font-size: 11px; }
   #slots { flex-wrap: wrap; font-size: 9px; gap: 3px; }
   #tools { max-width: 40vw; gap: 4px; } #tools button { padding: 6px 7px; font-size: 10px; letter-spacing: .06em; }
 }

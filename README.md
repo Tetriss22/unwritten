@@ -68,6 +68,12 @@ Five places sit out in the wilds, each on its own ground, with a chest, a guard 
 - **The Frozen Wreck** (Whiteout Pass): a ship frozen in the snow, mast and cargo still aboard.
 - **The Fallen Archive** (the Blank): the last library walls and shelves.
 
+## Town life
+
+Every town is busy. A ploughman drives a paper ox across the nearest wheat field and leaves real furrows in the ground letters (towns without a field hoe a garden by the square instead); when the rows are done the wheat grows back and he starts again. A butcher chops at a block, a woodcutter splits logs (every fourth swing the halves fly off as physical pieces), a water carrier walks between the well and the doors, a sweeper sweeps the square, and two children play tag. Smiths hammer at their stalls, outfitters sew, alchemists stir.
+
+Townsfolk walk the square, stop to talk to each other in speech bubbles, greet the Scribe, step aside for you and your horse, cheer when you kill an unwriter nearby, complain when you break their crates, shout when the wheat catches fire, and run for a door and hide when an unwriter comes into town. Talk to any of them with E.
+
 ## Wheat burns
 
 There are many more wheat fields in the Margin. A fireball, a lightning strike or the Cinder Mantle sets wheat alight; the fire runs from stalk to stalk until the whole field is ash, and hurts every unwriter standing in it.

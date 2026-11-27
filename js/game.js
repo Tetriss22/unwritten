@@ -32,7 +32,7 @@ const SAVE = 'unwritten.world.v3';      // v3: the world grew, old positions no 
 const readSave = () => { try { return JSON.parse(localStorage.getItem(SAVE) || 'null'); } catch (e) { return null; } };
 const clearSave = () => { try { localStorage.removeItem(SAVE); } catch (e) { /* storage unavailable */ } };
 function save() {
-  try { localStorage.setItem(SAVE, JSON.stringify({ taken: W.letters.filter(l => l.state === 'taken').map(l => l.id), lit: W.lands.map(l => l.lit), cp: [P.cx, P.cy], t: S.runT, d: S.deaths, lvl: P.lvl, xp: P.xp, wp: P.weapon, elx: W.elixirs.filter(e => e.gone).map(e => e.id), gear: P.gear, bag: P.bag, cch: W.caches.filter(c => c.gone).map(c => c.id), mats: P.mats, own: P.owned, perm: P.perm, brk: W.wreck.items.filter(i => !i.alive).map(i => i.id), sites: W.sites.filter(q => q.found).map(q => q.i), bombs: P.bombs, tmp: P.temper })); } catch (e) { /* storage unavailable */ }
+  try { localStorage.setItem(SAVE, JSON.stringify({ taken: W.letters.filter(l => l.state === 'taken').map(l => l.id), lit: W.lands.map(l => l.lit), cp: [P.cx, P.cy], t: S.runT, d: S.deaths, lvl: P.lvl, xp: P.xp, wp: P.weapon, elx: W.elixirs.filter(e => e.gone).map(e => e.id), gear: P.gear, bag: P.bag, cch: W.caches.filter(c => c.gone).map(c => c.id), mats: P.mats, own: P.owned, perm: P.perm, wv: 2, brk: W.wreck.items.filter(i => !i.alive).map(i => i.id), sites: W.sites.filter(q => q.found).map(q => q.i), bombs: P.bombs, tmp: P.temper })); } catch (e) { /* storage unavailable */ }
 }
 
 // ---------------------------------------------------------------- HUD
@@ -50,8 +50,9 @@ function updateMsg(dt) {
   } else { msg.hold -= dt; if (msg.hold <= 0) { msg.cur = null; el.innerHTML = ''; } }
 }
 function hudHearts() {
-  let s = ''; for (let i = 0; i < P.maxHp; i++) s += i < P.hp ? '\u25ae' : '<i>\u25af</i>';
-  $('hearts').innerHTML = '<b>HP</b> ' + s + ' <small>' + Math.max(0, P.hp) + '/' + P.maxHp + '</small>';
+  let s = ''; for (let i = 0; i < P.maxHp; i++) s += `<span class="h${i < P.hp ? '' : ' e'}${i === P.hp && W && W.lastHp > P.hp ? ' lost' : ''}">\u2665</span>`;
+  if (W) W.lastHp = P.hp;
+  $('hearts').innerHTML = s;
 }
 function hudWord() {
   const land = W.lands[S.land], w = land.def.word; let s = '';
@@ -102,7 +103,7 @@ function loadWorld() {
   const statics = [];
   W.wreck = new Wreck(R.root, B.T, WH);
   for (const p of B.props) {
-    const g = M.makeProp(p); place(g, p.x, p.y);
+    const g = M.makeProp(p); place(g, p.x, p.y); if (p.hs) g.scale.y = p.hs;
     let dyn = p.barrier !== undefined;
     g.traverse(m => { if (m.userData.flame || m.userData.float || m.userData.spin) dyn = true; });
     if (!dyn && BREAK[p.type]) { W.wreck.add(p, g); continue; }
@@ -127,6 +128,7 @@ function loadWorld() {
   }
   W.horse = M.makeHorse(); W.horse.x = B.start.x - 2.2; W.horse.y = B.start.y + 1.2; W.horse.face = 0.4; W.horse.call = false; W.horse.gait = 0; R.root.add(W.horse.g);
   W.npcs = B.npcs.map(n => { const g = M.makeNPC(n.hue); place(g, n.x, n.y); R.root.add(g); return { ...n, g, ph: rnd(6) }; });
+  buildFolk(B);
   W.drops = []; W.firstDrop = false; W.arrows = []; W.fires = new Map(); W.burnt = new Set(); W.fireDirty = false; P.mats = { dust: 0, ess: 0, scrap: 0 }; P.owned = {}; P.perm = { ink: 0, bag: 0 }; P.bombs = 0; P.temper = {}; P.flask = 0; W.bombs = []; P.gear = { robe: null, ring: null, charm: null }; P.bag = []; P.st = null; W.fire = null; W.said = {}; W.fireballs = []; W.burns = []; W.bolts = []; W.skybolts = []; spawnElixirs(); spawnCaches(); spawnWild();
   if (!P.m) P.m = M.makeHero();
   R.root.add(P.m.g); P.m.g.visible = true; tintRobe();
@@ -152,7 +154,7 @@ function applySave(sv) {
   Object.assign(P, { x: sv.cp[0], y: sv.cp[1], cx: sv.cp[0], cy: sv.cp[1] });
   S.camX = P.x; S.camY = P.y; S.runT = sv.t || 0; S.deaths = sv.d || 0;
   P.mats = Object.assign({ dust: 0, ess: 0, scrap: 0 }, sv.mats); P.owned = sv.own || {}; P.perm = Object.assign({ ink: 0, bag: 0 }, sv.perm); P.bombs = sv.bombs || 0; P.temper = sv.tmp || {};
-  for (const id of sv.brk || []) if (W.wreck.items[id]) W.wreck.remove(W.wreck.items[id]);
+  if (sv.wv === 2) for (const id of sv.brk || []) if (W.wreck.items[id]) W.wreck.remove(W.wreck.items[id]);
   W.wreck.build(); for (const q of W.sites) if ((sv.sites || []).includes(q.i)) q.found = true;
   if (sv.gear) { P.gear = Object.assign({ robe: null, ring: null, charm: null }, sv.gear); P.bag = sv.bag || []; P.st = null; tintRobe(); }
   P.lvl = sv.lvl || 1; P.xp = sv.xp || 0; applyLevel(); P.hp = P.maxHp; P.ink = P.maxInk; hudHearts();
@@ -250,7 +252,7 @@ function interact() {
     once('tower', 'High ground. Nothing reaches you up here, and thin lights show where things are buried.', 3.8); return;
   }
   if (t.ref.shop) { dismount(); return toggleShop(t.ref.shop, t.ref); }
-  say(t.ref.name + ': "' + t.ref.line + '"', 4.2); audio.play('letter', -5);
+  t.ref.talkT = 4.5; say(t.ref.name + ': "' + t.ref.line + '"', 4.2); audio.play('letter', -5);
 }
 function campfire() {
   if (S.mode !== 'play' || P.up || P.mounted) return;
@@ -295,9 +297,13 @@ const ELX = { xp: { col: [1, 0.85, 0.4] }, ink: { col: [0.4, 0.7, 1] }, hp: { co
 const xpNeed = (l) => 30 + l * 30;
 function applyLevel() { const st = GS(); P.dmgMul = (1 + 0.2 * (P.lvl - 1)) * (1 + st.dmg / 100); P.maxHp = 5 + Math.floor(P.lvl / 2) + st.hp; P.maxInk = 60 + 10 * (P.lvl - 1) + st.ink + P.perm.ink * 10; }
 function hudStats() {
-  const bar = (v, max, n = 10) => { const k = Math.round(clamp(v / max, 0, 1) * n); return '▮'.repeat(k) + '<i>' + '▯'.repeat(n - k) + '</i>'; };
-  $('lv').innerHTML = '<b>LV ' + P.lvl + '</b> ' + bar(P.xp, xpNeed(P.lvl)) + ' <small>' + Math.floor(P.xp) + '/' + xpNeed(P.lvl) + '</small>';
-  $('ink').innerHTML = '<b>INK</b> ' + bar(P.ink, P.maxInk) + ' <small>' + Math.floor(P.ink) + '/' + P.maxInk + '</small>';
+  // a filling bar: built once, then only its width and numbers change, so it can slide
+  const bar = (id, label, v, max) => {
+    const el = $(id); if (!el.firstChild || !el.querySelector('.bar')) el.innerHTML = '<b></b><span class="bar"><i></i></span><small></small>';
+    el.children[0].textContent = label; el.querySelector('.bar i').style.width = (clamp(v / max, 0, 1) * 100).toFixed(1) + '%'; el.children[2].textContent = Math.floor(v) + '/' + max;
+  };
+  bar('lv', 'LV ' + P.lvl, P.xp, xpNeed(P.lvl));
+  bar('ink', 'INK', P.ink, P.maxInk);
   const sp = (k, key, label) => P.lvl >= SPELLS[k].lvl ? `<span class="${P.ink >= SPELLS[k].cost ? '' : 'off'}">${key} ${label}</span>` : `<span class="off">${key} LV${SPELLS[k].lvl}</span>`;
   if (W && W.caches) $('secrets').innerHTML = '<b>SECRETS</b> ' + W.caches.filter(c => c.gone).length + '<i>/' + W.caches.length + '</i>' + ' &nbsp;<b>DUST</b> ' + P.mats.dust + ' &nbsp;<b>ESS</b> ' + P.mats.ess + ' &nbsp;<b>SCRAP</b> ' + P.mats.scrap + (P.bombs ? ' &nbsp;<b>BOMBS</b> ' + P.bombs : '');
   $('slots').innerHTML = '<span>Q ' + WEAPONS[P.weapon].name + '</span>' + sp('fire', '1', 'FIRE') + sp('bolt', '2', 'BOLT') + '<span class="bagk">I BAG ' + P.bag.length + '</span>';
@@ -680,6 +686,7 @@ function igniteAt(x, y) {
 }
 function igniteCircle(x, y, r) {
   let any = false; for (let dy = -r; dy <= r; dy += 0.5) for (let dx = -r; dx <= r; dx += 0.5) if (dx * dx + dy * dy <= r * r) any = igniteAt(x + dx, y + dy) || any;
+  if (any) folkEvent('fire', x, y);
   if (any) once('wheat', 'The wheat is burning. Fire runs through a whole field, and through whatever stands in it.', 3.8);
 }
 function updateFire(dt) {
@@ -721,7 +728,7 @@ function brokeProp(it, force) {
   S.shake = Math.max(S.shake, big ? 0.45 : 0.18);
   W.wreckDirty = true;
   if (d.boom) return kegBoom(it);
-  audio.play(d.stone ? 'crumble' : 'crack', big ? 1 : 0);
+  audio.play(d.stone ? 'crumble' : 'crack', big ? 1 : 0); folkEvent('break', it.x, it.y);
   if (S.mode !== 'play') return;
   const sc = (d.loot || 0) + (d.stone ? 1 : 0);
   if (sc) { const n = sc + (Math.random() < 0.5 ? 1 : 0); P.mats.scrap += n; floatText(it.x, it.y, Math.min(3, it.top + 0.8), '+' + n + ' scrap', 'mat'); }
@@ -843,6 +850,264 @@ function buildSites(B) {
   });
   const map = $('map'); map.querySelectorAll('.site').forEach(d => d.remove());
   for (let k = 0; k < W.sites.length; k++) { const d = document.createElement('div'); d.className = 'ml site'; map.appendChild(d); }
+}
+
+// ---------------------------------------------------------------- town life: people with work to do, who talk to each other and to you
+const FOLK = {
+  farmer: { tool: 'hoe', names: ['Ploughman Ade', 'Farmer Nell', 'Ploughwife Ros', 'Farmer Gil', 'Ploughman Uri'], line: 'The ox does the pulling. I just keep the lines straight.' },
+  butcher: { tool: 'cleaver', names: ['Butcher Hob', 'Butcher Agna', 'Butcher Lew', 'Butcher Dagny', 'Butcher Rolf'], line: 'Fresh cuts. Keep your fingers off the block.' },
+  woodcutter: { tool: 'axe', names: ['Woodcutter Finn', 'Woodcutter Edda', 'Woodcutter Bo', 'Woodcutter Ash', 'Woodcutter Sten'], line: 'Every fourth swing, a log gives up.' },
+  carrier: { tool: 'bucket', names: ['Water-girl Mae', 'Water-boy Tod', 'Carrier Ilse', 'Carrier Pim', 'Carrier Una'], line: 'Well to door, door to well. All day.' },
+  sweeper: { tool: 'broom', names: ['Sweeper Cob', 'Sweeper Lin', 'Sweeper Oda', 'Sweeper Rik', 'Sweeper Vee'], line: 'The unwriters drop letters everywhere. Somebody has to sweep them up.' },
+  kid: { names: ['Kit', 'Bee', 'Nim', 'Ollie', 'Rue', 'Sky', 'Wick', 'Pell', 'Juno', 'Tib'], line: 'Tag! You are it! No, wait, I am it.' },
+};
+const CHAT = [
+  ['Morning.', 'Is it? The sky looks unwritten.'], ['Did you hear? The bridge came back.', 'Someone wrote it. Six letters.'], ['Bread is late.', 'The oven forgot its own name again.'],
+  ['Saw a Typo by the fence.', 'Hit it with a broom. Works for me.'], ['Any word from the wilds?', 'Only crates breaking. Lots of crates.'], ['My roof lost a letter last night.', 'Which one?', ],
+  ['The Scribe is back.', 'Good. Somebody has to write.'], ['Is that smoke?', 'Just the smith. I hope.'], ['How is the ox?', 'Stubborn. Like its owner.'],
+  ['They say there is a ship in the snow.', 'Ships do not go in snow.', ], ['Fresh water?', 'Fresh as ink.'], ['Did the Editor cut anything today?', 'Not yet. Knock on wood.'],
+];
+const GREET = ['Hello, Scribe!', 'Mind the wheat.', 'Back again?', 'Nice robe.', 'Write us a roof, would you?', 'Good day!', 'Careful out there.', 'The smith is that way.', 'You look tired.', 'Ink on your sleeve.'];
+const FEAR = ['Unwriter!', 'Inside, quick!', 'Run!', 'Not again!', 'Help!'], CHEER = ['Got it!', 'Thank you, Scribe!', 'Ha! Gone!', 'Good riddance.', 'Well struck!'];
+const OI = ['Oi! That was mine!', 'Hey! My crate!', 'Who is paying for that?', 'Really?'], CAREFUL = ['Hey! Careful!', 'Watch the quill!', 'Not near me!'], FIRE_CRY = ['Fire! The wheat!', 'Water! Bring water!', 'Fire!'];
+const pickOf = (a) => a[Math.floor(Math.random() * a.length)];
+
+function buildFolk(B) {
+  const T = B.T, towns = B.nodes.filter(n => n.town), rr = rng(4242);
+  const free = (x, y, r = 0.45) => !T.blocked(x, y, r);
+  for (const n of W.npcs) {
+    const t = towns.find(q => dist(q.x, q.y, n.x, n.y) < q.r + 6);
+    Object.assign(n, { role: n.shop ? 'maker' : t ? 'walker' : 'idle', town: t || null, hx: n.x, hy: n.y, face: 0, st: 'idle', t: rr() * 3, cool: rr() * 10, greetT: 0, spd: 1.35 });
+  }
+  W.towns = towns.map((n, ti) => {
+    const doors = [];
+    for (const p of B.props) if ((p.type === 'house' || p.type === 'cabin') && dist(p.x, p.y, n.x, n.y) < n.r + 12) {
+      for (const k of [0.6, 1.0, 1.4]) { const d = 1.15 * p.s + k, x = p.x + Math.sin(p.rot) * d, y = p.y + Math.cos(p.rot) * d; if (free(x, y, 0.35)) { doors.push([x, y]); break; } }
+    }
+    const roads = B.edges.filter(e => e.a === n || e.b === n).map(e => { const o = e.a === n ? e.b : e.a; return Math.atan2(o.y - n.y, o.x - n.x); });
+    const angs = Array.from({ length: 24 }, (_, i) => i / 24 * 6.283).map(a => ({ a, s: Math.min(...roads.map(r => { let d = Math.abs(a - r) % 6.283; return d > Math.PI ? 6.283 - d : d; }), 9) })).sort((p, q) => q.s - p.s);
+    const used = [[n.x + 1.3, n.y + 0.4], ...W.npcs.filter(q => q.shop && q.town === n).map(q => [q.x, q.y])];
+    const spot = (rads) => { for (const { a } of angs) for (const rad of rads) { const x = n.x + Math.cos(a) * rad, y = n.y + Math.sin(a) * rad; if (free(x, y, 0.9) && used.every(u => dist(u[0], u[1], x, y) > 3)) { used.push([x, y]); return [x, y, a]; } } return null; };
+    return { n, i: ti, doors: doors.length ? doors : [[n.x, n.y + n.r * 0.6]], spot };
+  });
+  let k = 0;
+  const add = (role, town, x, y, extra = {}) => {
+    const hue = 40 + k * 7, def = FOLK[role], g = M.makeNPC(hue); place(g, x, y); R.root.add(g);
+    if (role === 'kid') g.scale.setScalar(0.68);
+    if (def.tool) { const tl = M.makeTool(def.tool); g.userData.hand.add(tl); g.userData.tool = tl; }
+    const f = { x, y, name: def.names[(town.i + k) % def.names.length], line: def.line, hue, g, ph: rr() * 6, role, town: town.n, T: town, hx: x, hy: y, face: rr() * 6.28, st: 'idle', t: rr() * 3, cool: 5 + rr() * 10, greetT: 0, spd: role === 'kid' ? 3.0 : 1.35, ...extra };
+    W.npcs.push(f); k++; return f;
+  };
+  for (const tw of W.towns) {
+    const n = tw.n;
+    // the butcher's block and the woodcutter's stump stand just inside the square, away from the roads
+    const b = tw.spot([n.r * 0.72, n.r * 0.55, n.r * 0.88]);
+    if (b) { const ws = M.makeWorkspot('block'); place(ws, b[0], b[1]); ws.rotation.y = rotY(b[2] + Math.PI); R.root.add(ws); const a = b[2] + Math.PI; add('butcher', tw, b[0] + Math.cos(a) * 1.0, b[1] + Math.sin(a) * 1.0, { wx: b[0], wy: b[1] }); }
+    const s = tw.spot([n.r * 0.72, n.r * 0.55, n.r * 0.88]);
+    if (s) { const ws = M.makeWorkspot('stump'); place(ws, s[0], s[1]); R.root.add(ws); const lg = M.makeWorkspot('log'); place(lg, s[0], s[1], 0.5); R.root.add(lg); const a = s[2] + Math.PI; add('woodcutter', tw, s[0] + Math.cos(a) * 1.15, s[1] + Math.sin(a) * 1.15, { wx: s[0], wy: s[1], log: lg, chops: 0 }); }
+    add('carrier', tw, n.x + 1.3, n.y + 1.6, { leg: 0 });
+    add('sweeper', tw, n.x - 1.5, n.y - 1.2);
+    const k1 = add('kid', tw, n.x - 1, n.y + 1), k2 = add('kid', tw, n.x + 1, n.y - 1); k1.it = true; k1.pal = k2; k2.pal = k1;
+    // a field nearby gets ploughed by an ox; a town with no field gets a hoed garden by the square
+    const fld = B.nodes.filter(q => q.field && q.land === n.land && dist(q.x, q.y, n.x, n.y) < 30).sort((p, q) => dist(p.x, p.y, n.x, n.y) - dist(q.x, q.y, n.x, n.y))[0];
+    let band = null;
+    if (fld) {
+      const ux = (n.x - fld.x) / (dist(n.x, n.y, fld.x, fld.y) || 1), uy = (n.y - fld.y) / (dist(n.x, n.y, fld.x, fld.y) || 1), vx = -uy, vy = ux, pts = [];
+      for (let r = 0; r < 9; r++) { const off = fld.r * 0.72 - r * 0.62, L = Math.sqrt(Math.max(0, (fld.r * 0.86) ** 2 - off * off)); const cx = fld.x + ux * off, cy = fld.y + uy * off, e = [[cx - vx * L, cy - vy * L], [cx + vx * L, cy + vy * L]]; if (r % 2) e.reverse(); pts.push(e[0], e[1]); }
+      band = { pts, ox: true, land: n.land };
+    } else {
+      const g0 = tw.spot([n.r + 2.6, n.r + 3.4, n.r + 2.0]);
+      if (g0) { const a = g0[2], ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux, pts = []; for (let r = 0; r < 5; r++) { const cx = g0[0] + ux * (r * 0.55 - 1.1), cy = g0[1] + uy * (r * 0.55 - 1.1), e = [[cx - vx * 1.8, cy - vy * 1.8], [cx + vx * 1.8, cy + vy * 1.8]]; if (r % 2) e.reverse(); pts.push(e[0], e[1]); } band = { pts, ox: false, land: n.land }; }
+    }
+    if (band) {
+      const f = add('farmer', tw, band.pts[0][0], band.pts[0][1], { band, seg: 0, segT: 0, cells: new Map(), phase: 'plough' });
+      if (band.ox) { f.ox = M.makeOx(); R.root.add(f.ox); f.g.userData.tool.visible = false; f.name = f.name; f.line = 'The ox does the pulling. I just keep the lines straight.'; }
+      else f.line = 'Hard ground for a garden. Still, the turnips do not mind.';
+    }
+  }
+}
+
+function folkSay(n, text, cls = '', hold = 2.6) { n.say = { text, t: hold, cls }; }
+function folkNear(x, y, r) { let best = null, bd = r; for (const n of W.npcs) { if (n.hidden || n.role === 'idle') continue; const d = dist(n.x, n.y, x, y); if (d < bd) { bd = d; best = n; } } return best; }
+// something happened in town: the nearest person reacts
+function folkEvent(kind, x, y) {
+  if (!W.npcs || S.t - (W.folkEvT || -9) < 1.2) return;
+  const n = folkNear(x, y, kind === 'kill' ? 14 : kind === 'fire' ? 12 : kind === 'break' ? 8 : 3); if (!n || n.st === 'flee') return;
+  W.folkEvT = S.t;
+  if (kind === 'kill') { folkSay(n, pickOf(CHEER), 'yell'); n.wave = 1.4; }
+  if (kind === 'break') { folkSay(n, pickOf(OI), 'yell'); n.lookT = 2; }
+  if (kind === 'swing') { folkSay(n, pickOf(CAREFUL), 'yell'); n.hop = 0.35; n.lookT = 1.5; }
+  if (kind === 'fire') { folkSay(n, pickOf(FIRE_CRY), 'fear'); n.scare = { x, y, t: 3 }; }
+}
+
+function folkMove(n, tx, ty, sp, dt, ghost = false) {
+  const dx = tx - n.x, dy = ty - n.y, d = Math.hypot(dx, dy); if (d < 0.05) return true;
+  const st = Math.min(d, sp * dt), mx = dx / d * st, my = dy / d * st, T = W.T;
+  if (ghost) { n.x += mx; n.y += my; }
+  else if (!T.blocked(n.x + mx, n.y + my, 0.3)) { n.x += mx; n.y += my; }
+  else if (!T.blocked(n.x + mx, n.y, 0.3)) n.x += mx;
+  else if (!T.blocked(n.x, n.y + my, 0.3)) n.y += my;
+  else { n.stuck = (n.stuck || 0) + dt; }
+  n.face = Math.atan2(dy, dx); n.walking = true;
+  return d < 0.35;
+}
+function squarePoint(n) { const tn = n.town; for (let i = 0; i < 10; i++) { const a = Math.random() * 6.283, r = Math.random() * tn.r * 0.85, x = tn.x + Math.cos(a) * r, y = tn.y + Math.sin(a) * r; if (!W.T.blocked(x, y, 0.5)) return [x, y]; } return [tn.x, tn.y]; }
+// the door to run for: near, and not on the far side of the thing being run from
+function safeDoor(n, foe) { const ds = n.T ? n.T.doors : (W.towns.find(t => t.n === n.town) || { doors: [[n.x, n.y]] }).doors; let b = ds[0], bs = -1e9; for (const d of ds) { const sc = -dist(d[0], d[1], n.x, n.y) + 1.6 * Math.min(6, dist(d[0], d[1], foe.x, foe.y)); if (sc > bs) { bs = sc; b = d; } } return b; }
+function nearestDoor(n) { let b = null, bd = 1e9; for (const d of n.T ? n.T.doors : W.towns.find(t => t.n === n.town).doors) { const q = dist(d[0], d[1], n.x, n.y); if (q < bd) { bd = q; b = d; } } return b; }
+
+function plough(n, dt) {
+  const b = n.band, pts = b.pts, T = W.T;
+  if (n.phase === 'rest') { n.t += dt; if (n.t > 7) { n.phase = 'grow'; n.t = 0; } return null; }
+  if (n.phase === 'grow') {
+    // the furrows fill back in with green, and the ox starts the field again
+    for (const [i, v] of n.cells) { if (T.fire && T.fire[i]) continue; T.data.set(v, i * 4); }
+    n.cells.clear(); W.fireDirty = true; n.phase = 'back'; n.seg = 0; burst(n.x, n.y, 1.2, 10, 0x9be070, 3); return null;
+  }
+  if (n.phase === 'back') { if (folkMove(n, pts[0][0], pts[0][1], n.spd * 1.4, dt, true)) { n.phase = 'plough'; n.seg = 0; } return null; }
+  const a = pts[n.seg], c = pts[n.seg + 1]; if (!c) { n.phase = 'rest'; n.t = 0; return null; }
+  const done = folkMove(n, c[0], c[1], b.ox ? 1.05 : 0.8, dt, true); n.stuck = 0;
+  const hd = Math.atan2(c[1] - a[1], c[0] - a[0]); n.face = Math.atan2(c[1] - n.y, c[0] - n.x) || hd;
+  // the blade cuts just ahead of the ploughman
+  const bx = n.x + Math.cos(n.face) * (b.ox ? 0.9 : 0.8), by = n.y + Math.sin(n.face) * (b.ox ? 0.9 : 0.8), row = n.seg >> 1;
+  if (n.seg % 2 === 0) {
+    const c0x = Math.floor((bx - 0.3) * 8), c1x = Math.floor((bx + 0.3) * 8), c0y = Math.floor((by - 0.3) * 8), c1y = Math.floor((by + 0.3) * 8);
+    for (let cy = c0y; cy <= c1y; cy++) for (let cx = c0x; cx <= c1x; cx++) {
+      if (cx < 0 || cy < 0 || cx >= T.w || cy >= T.h) continue; const i = cy * T.w + cx; if (T.solid[i] || Math.hypot((cx + 0.5) / 8 - bx, (cy + 0.5) / 8 - by) > 0.3) continue;
+      if (!n.cells.has(i)) n.cells.set(i, T.data.slice(i * 4, i * 4 + 4));
+      const k = n.cells.get(i)[3] & 128; T.put(cx, cy, (cx + cy) % 3 ? '=' : '~', b.land * 16 + 10, 0.5 + ((cx * 7 + cy * 3) % 5) * 0.05, k); W.fireDirty = true;
+    }
+    if (Math.random() < dt * 6) burst(bx, by, 0.2, 1, 0xc8a070, 1.6);
+  }
+  if (done) n.seg++;
+  return [bx, by];
+}
+
+function updateFolk(dt) {
+  if (!W.npcs) return;
+  const enemies = W.enemies.filter(e => !e.dead && e.state !== 'sleep' && e.type !== 'boss');
+  for (const n of W.npcs) {
+    const dp = dist(P.x, P.y, n.x, n.y); if (dp > 42) { if (n.bub) n.bub.style.display = 'none'; continue; }
+    n.walking = false; n.t += dt; n.cool -= dt; n.greetT -= dt; n.lookT = (n.lookT || 0) - dt; n.wave = Math.max(0, (n.wave || 0) - dt); n.hop = Math.max(0, (n.hop || 0) - dt); n.talkT = (n.talkT || 0) - dt;
+    if (n.say) { n.say.t -= dt; if (n.say.t <= 0) n.say = null; }
+    const u = n.g.userData; let armR = 0, armL = 0, armRz = 0, lookP = false, h = 0;
+    // fear first: an unwriter close by sends everyone (but makers and the signpost folk) to the nearest door
+    if (n.role !== 'idle' && n.role !== 'maker') {
+      let foe = null, fd = 9; for (const e of enemies) { const d = dist(e.x, e.y, n.x, n.y); if (d < fd) { fd = d; foe = e; } }
+      if (n.scare) { n.scare.t -= dt; if (n.scare.t <= 0) n.scare = null; }
+      if (n.hidden) {
+        if (!enemies.some(e => dist(e.x, e.y, n.x, n.y) < 15) && (n.hideT -= dt) <= 0) { n.hidden = false; n.g.visible = true; n.st = 'idle'; folkSay(n, 'Is it gone?', '', 2); }
+        else continue;
+      } else if (foe || n.scare) {
+        if (n.st !== 'flee') { n.st = 'flee'; n.stuck = 0; if (S.t - (W.fearT || -9) > 0.7) { W.fearT = S.t; folkSay(n, pickOf(FEAR), 'fear'); } n.door = safeDoor(n, foe || n.scare); }
+        if (folkMove(n, n.door[0], n.door[1], 3.6, dt) || dist(n.x, n.y, n.door[0], n.door[1]) < 1.1 || n.stuck > 0.8) { n.stuck = 0; n.hidden = true; n.g.visible = false; n.hideT = 2.5; if (n.bub) n.bub.style.display = 'none'; continue; }
+        armR = armL = -2.6 + Math.sin(n.t * 14) * 0.3;
+      } else if (n.st === 'flee') n.st = 'idle';
+    }
+    if (n.st !== 'flee') {
+      // the Scribe comes close: stop, turn, and sometimes say hello
+      const busy = n.role === 'farmer' && n.phase === 'plough';
+      if (dp < 3.4 && !busy && n.role !== 'kid' && n.greetT <= 0 && S.mode === 'play' && S.t - (W.greetT || -9) > 3) { W.greetT = S.t; n.greetT = 60 + Math.random() * 40; folkSay(n, pickOf(GREET)); n.wave = 1.4; n.lookT = 1.8; }
+      if (n.role === 'idle' && dp < 7) lookP = true;
+      if (n.talkT > 0 || n.lookT > 0) lookP = true;
+      // step out of the way of the Scribe, more so of a horse
+      const room = P.mounted ? 1.6 : 0.85; if (dp < room && n.role !== 'maker' && n.role !== 'idle') { const a = Math.atan2(n.y - P.y, n.x - P.x); folkMove(n, n.x + Math.cos(a) * 0.6, n.y + Math.sin(a) * 0.6, 4, dt); }
+      if (!lookP) switch (n.role) {
+        case 'walker': {
+          if (n.st === 'chat') {
+            n.face = Math.atan2(n.pal.y - n.y, n.pal.x - n.x); armL = Math.sin(n.t * 3) * 0.25 - 0.3;
+            if (n.lead && n.t > n.next) { const ln = n.lines[n.li++]; if (ln) { folkSay(n.li % 2 ? n : n.pal, ln, '', 2.6); n.next = n.t + 2.8; } else { n.st = n.pal.st = 'idle'; n.cool = n.pal.cool = 18 + Math.random() * 14; } }
+            break;
+          }
+          if (n.st === 'idle') { n.tgt = Math.random() < 0.3 ? [n.town.x + 1.3 + rnd(-1.2, 1.2), n.town.y + 1.6] : Math.random() < 0.5 ? squarePoint(n) : nearestDoor(n); n.st = 'walk'; n.stuck = 0; }
+          if (n.st === 'walk') {
+            if (folkMove(n, n.tgt[0], n.tgt[1], n.spd, dt) || n.stuck > 1.5) { n.st = 'wait'; n.t = 0; n.waitT = 2 + Math.random() * 4; }
+            // a neighbour on the way: stop and talk
+            if (n.cool <= 0) for (const o of W.npcs) if (o !== n && o.role === 'walker' && (o.st === 'walk' || o.st === 'wait') && o.cool <= 0 && !o.hidden && dist(o.x, o.y, n.x, n.y) < 2.2) {
+              const c = pickOf(CHAT); n.st = o.st = 'chat'; n.pal = o; o.pal = n; n.lead = true; o.lead = false; n.lines = c; n.li = 0; n.next = n.t; break;
+            }
+          } else if (n.st === 'wait' && n.t > n.waitT) n.st = 'idle';
+          break;
+        }
+        case 'butcher': {
+          if (n.st === 'trip') { if (folkMove(n, n.tgt[0], n.tgt[1], n.spd, dt) || n.stuck > 2) { if (n.tgt === n.home2) { n.st = 'idle'; n.g.userData.tool.visible = true; } else { n.tgt = n.home2; folkSay(n, 'Delivered.', '', 1.6); } } armR = -0.2; break; }
+          if (n.t > 26 && Math.random() < dt * 0.2) { n.st = 'trip'; n.t = 0; n.home2 = [n.hx, n.hy]; n.tgt = nearestDoor({ ...n, x: n.hx + rnd(-8, 8), y: n.hy + rnd(-8, 8) }); n.stuck = 0; break; }
+          folkMove(n, n.hx, n.hy, n.spd, dt); n.face = Math.atan2(n.wy - n.y, n.wx - n.x);
+          const c = (n.t * 0.95) % 1; armR = c < 0.6 ? -0.3 - c / 0.6 * 2.3 : c < 0.72 ? -2.6 + (c - 0.6) / 0.12 * 2.3 : -0.3; armL = -0.7;
+          if (c >= 0.72 && (n.lastC || 0) < 0.72) { burst(n.wx, n.wy, 0.95, 3, Math.random() < 0.5 ? 0xff8a8a : 0xffe0e0, 2.4); if (dp < 16) audio.play('chop', dp < 6 ? 1 : 0.4); }
+          n.lastC = c; break;
+        }
+        case 'woodcutter': {
+          folkMove(n, n.hx, n.hy, n.spd, dt); n.face = Math.atan2(n.wy - n.y, n.wx - n.x);
+          const c = (n.t * 0.7) % 1; armR = c < 0.65 ? -0.6 - c / 0.65 * 2.6 : c < 0.78 ? -3.2 + (c - 0.65) / 0.13 * 2.5 : -0.7; armL = armR * 0.8;
+          if (c >= 0.78 && (n.lastC || 0) < 0.78 && n.log.visible) {
+            burst(n.wx, n.wy, 0.9, 4, 0xe0c8a0, 3); if (dp < 16) audio.play('chop', dp < 6 ? 1 : 0.4);
+            if (++n.chops % 4 === 0) {      // the log splits: two halves fly off and land as real pieces
+              n.log.visible = false; const mat = gmat(0xc89a6a, 'trunk', { flat: true });
+              for (const sd of [-1, 1]) { const a = n.face + Math.PI / 2 * sd; W.wreck.spawn(n.wx + Math.cos(a) * 0.12, 0.85, n.wy + Math.sin(a) * 0.12, 0.1, 0.34, 0.2, mat, null, Math.cos(a) * 2.6, 2.2, Math.sin(a) * 2.6).w.set(rnd(-4, 4), 0, rnd(-4, 4)); }
+              if (dp < 16) audio.play('crack', 0); after(1.3, () => { n.log.visible = true; });
+            }
+          }
+          n.lastC = c; break;
+        }
+        case 'carrier': {
+          if (n.st === 'idle' || !n.tgt) { n.leg = (n.leg || 0) + 1; n.tgt = n.leg % 2 ? n.T.doors[Math.floor(Math.random() * n.T.doors.length)] : [n.town.x + 1.3 + 0.9, n.town.y + 0.4 + 0.6]; n.st = 'walk'; n.stuck = 0; }
+          if (n.st === 'walk') { armR = -0.15; if (folkMove(n, n.tgt[0], n.tgt[1], n.spd, dt) || n.stuck > 2) { n.st = 'pour'; n.t = 0; } }
+          if (n.st === 'pour') { armR = -1.2; if (Math.random() < dt * 8) burst(n.x + Math.cos(n.face) * 0.6, n.y + Math.sin(n.face) * 0.6, 0.6, 1, 0x8ad8ff, 1.5); if (n.t > 2.2) n.st = 'idle'; }
+          break;
+        }
+        case 'sweeper': {
+          if (n.st === 'idle' || !n.tgt) { n.tgt = squarePoint(n); n.st = 'walk'; n.stuck = 0; }
+          if (n.st === 'walk' && (folkMove(n, n.tgt[0], n.tgt[1], n.spd * 0.8, dt) || n.stuck > 2)) { n.st = 'sweep'; n.t = 0; }
+          if (n.st === 'sweep') { armR = -0.5; armRz = Math.sin(n.t * 7) * 0.6; if (Math.random() < dt * 5) burst(n.x + Math.cos(n.face) * 0.9, n.y + Math.sin(n.face) * 0.9, 0.15, 1, 0xd8d0c0, 1.6); if (n.t > 3.5) n.st = 'idle'; }
+          break;
+        }
+        case 'kid': {
+          const o = n.pal; n.frz = Math.max(0, (n.frz || 0) - dt); if (n.frz > 0) { armL = armR = -2.8; break; }
+          if (n.follow > 0) { n.follow -= dt; folkMove(n, P.x - Math.cos(P.face) * 1.4, P.y - Math.sin(P.face) * 1.4, 4.2, dt); if (Math.random() < dt * 0.3) folkSay(n, pickOf(['Scribe! Scribe!', 'Can I hold the quill?', 'Wait for me!']), '', 1.6); }
+          else if (n.it) {
+            if (folkMove(n, o.x, o.y, 3.2, dt) || dist(n.x, n.y, o.x, o.y) < 0.7) { n.it = false; o.it = true; o.frz = 1; folkSay(n, 'Tag!', 'yell', 1.2); }
+          } else {
+            let a = Math.atan2(n.y - o.y, n.x - o.x) + Math.sin(n.t * 1.3 + n.ph) * 0.9; const tn = n.town;
+            if (dist(n.x, n.y, tn.x, tn.y) > tn.r + 2) a = Math.atan2(tn.y - n.y, tn.x - n.x);
+            folkMove(n, n.x + Math.cos(a), n.y + Math.sin(a), 2.9, dt);
+            if (dp < 6 && Math.random() < dt * 0.04) n.follow = 6;
+          }
+          armL = Math.sin(n.t * 16) * 0.9; armR = -armL; break;
+        }
+        case 'farmer': {
+          const blade = plough(n, dt);
+          if (n.ox) { const a = n.face, ox = n.x + Math.cos(a) * 2.95, oy = n.y + Math.sin(a) * 2.95; place(n.ox, ox, oy); n.ox.rotation.y = rotY(a); const go = n.phase === 'plough' || n.phase === 'back'; n.ox.userData.legs.forEach((l, i) => { l.rotation.x = go ? Math.sin(S.t * 7 + (i % 2) * Math.PI + (i > 1 ? Math.PI / 2 : 0)) * 0.45 : 0; }); n.ox.userData.head.rotation.x = Math.sin(S.t * (go ? 3.5 : 0.8)) * 0.1; }
+          if (n.phase === 'plough') { armR = armL = -1.0; if (!n.ox) { const c = (n.t * 1.2) % 1; armR = armL = -0.4 - Math.sin(c * Math.PI) * 1.6; } if (n.ox && Math.random() < dt * 0.05) folkSay(n, pickOf(['Hup!', 'Straight, now.', 'Easy, girl.']), '', 1.4); }
+          if (n.phase === 'rest') { armL = -0.2; armR = -0.2; }
+          if (blade && n.ox && dp < 18 && Math.random() < dt * 1.2) audio.play('step');
+          break;
+        }
+        case 'maker': {
+          // makers work at their stall until someone comes to trade
+          const c = (n.t * (n.shop === 'smith' ? 1.4 : 0.6)) % 1;
+          if (n.shop === 'smith') { armR = c < 0.7 ? -0.4 - c / 0.7 * 1.6 : -2.0 + (c - 0.7) / 0.3 * 1.6; if (c < 0.05 && (n.lastC || 1) > 0.9) { burst(n.x + Math.cos(n.face) * 0.8, n.y + Math.sin(n.face) * 0.8, 0.9, 4, 0xffd060, 4); if (dp < 12) audio.play('clink', dp < 5 ? 1 : 0.4); } }
+          else if (n.shop === 'tailor') { armR = -1.0 + Math.sin(n.t * 5) * 0.35; armL = -0.9; }
+          else { armR = -1.1; armRz = Math.sin(n.t * 2.4) * 0.5; if (Math.random() < dt * 2) burst(n.x + Math.cos(n.face) * 0.9, n.y + Math.sin(n.face) * 0.9, 1.2, 1, 0x9be070, 1); }
+          n.lastC = c; n.face = n.workA ?? (n.workA = n.town ? Math.atan2(n.y - n.town.y, n.x - n.town.x) : n.face);
+          break;
+        }
+      }
+    }
+    if (lookP) n.face = Math.atan2(P.y - n.y, P.x - n.x);
+    if (n.wave > 0) armL = -2.7 + Math.sin(n.t * 12) * 0.35;
+    if (n.walking) { h = Math.abs(Math.sin(n.t * (n.role === 'kid' ? 14 : 9))) * 0.08; if (!armR) armR = -Math.sin(n.t * 9) * 0.45; if (!armL) armL = Math.sin(n.t * 9) * 0.45; }
+    if (n.hop > 0) h += Math.sin(n.hop / 0.35 * Math.PI) * 0.4;
+    place(n.g, n.x, n.y, h + Math.sin(S.t * 1.8 + n.ph) * 0.02);
+    n.g.rotation.y += angDiff(rotY(n.face), n.g.rotation.y) * Math.min(1, dt * 7);
+    if (u.armR) { u.armR.rotation.x += (armR - u.armR.rotation.x) * Math.min(1, dt * 14); u.armR.rotation.z += (armRz - u.armR.rotation.z) * Math.min(1, dt * 10); u.armL.rotation.x += (armL - u.armL.rotation.x) * Math.min(1, dt * 12); }
+    // speech bubbles
+    if (n.say && dp < 26 && S.mode !== 'title') {
+      if (!n.bub) { n.bub = document.createElement('div'); $('fx').appendChild(n.bub); }
+      if (n.bub.dataset.t !== n.say.text) { n.bub.dataset.t = n.say.text; n.bub.textContent = n.say.text; n.bub.className = 'say ' + n.say.cls; }
+      const [x, y] = R.toScreen(n.x, n.y, (n.role === 'kid' ? 2.2 : 3.2) + (dp < 9 ? 0.55 : 0)); n.bub.style.display = 'block'; n.bub.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+    } else if (n.bub) n.bub.style.display = 'none';
+  }
 }
 
 // ---- sound settings
@@ -1046,7 +1311,7 @@ function startAttack(mx, my, moving) {
 }
 function doHit() {
   const wp = WEAPONS[P.weapon], spin = P.combo === 3, range = spin ? 2.15 : wp.range, half = spin ? 4 : wp.half, base = (spin ? 2 : wp.dmg) * temper(wp), st = GS(); let landed = null;
-  swingFx(wp, spin);
+  swingFx(wp, spin); folkEvent('swing', P.x, P.y);
   if (wp.bow && !spin) { shootArrow(P.face); return; }
   if (wp.slam) { const hx = P.x + Math.cos(P.face) * 1.5, hy = P.y + Math.sin(P.face) * 1.5; pulse(hx, hy, [1, 0.85, 0.5], 1.5, 8, 0.45, 0.3); glow(hx, hy, 5, 1.5, [1, 0.85, 0.5], 0.3); burst(hx, hy, 0.3, 10, 0xffd98a, 6); S.shake = Math.max(S.shake, 0.45); audio.play('slam'); }
   if (spin) pulse(P.x, P.y, [1, 0.95, 0.8], 0.9, 9, 0.28, 0.4);
@@ -1215,6 +1480,7 @@ function hitEnemy(e, dmg, a, soft = false, crit = false) {
 function killEnemy(e) {
   e.dead = true;
   if (e.type === 'boss') return bossDead(e);
+  folkEvent('kill', e.x, e.y);
   gainXP(Math.round(({ blot: 6, scratch: 8, brute: 20, typo: 3, asterisk: 8, ghost: 14, redactor: 45, mimic: 40 }[e.type] || 5) * (e.elite ? 4 : e.wild ? 1.5 : 1))); if (e.elite) gainMats(8, 1); maybeDrop(e); gainMats(...(KILL_MATS[e.type] || [1, 0]), e.x, e.y);
   if (GS().fx.pop) { pulse(e.x, e.y, [1, 0.55, 0.15], 1.2, 9, 0.4); for (const o of W.enemies) if (!o.dead && o !== e && dist(o.x, o.y, e.x, e.y) < 2.4 + o.r) after(0.08, () => hitEnemy(o, ...roll(1.5), Math.atan2(o.y - e.y, o.x - e.x))); }
   removeObj(e.o.g); audio.play('kill'); glow(e.x, e.y, 4, 1.2, [0.75, 0.55, 1], 0.45);
@@ -1488,7 +1754,7 @@ function updateWorld(dt) {
     if (Math.random() < dt * 7) burst(f.x + rnd(-0.2, 0.2), f.y + rnd(-0.2, 0.2), 0.7, 1, Math.random() < 0.5 ? 0xffb050 : 0xffe9a8, 0.9);
     if (f.heal > 2.2 && play && P.hp < P.maxHp && dist(P.x, P.y, f.x, f.y) < 3.2) { f.heal = 0; P.hp++; hudHearts(); audio.play('heart'); floatText(P.x, P.y, 2.8, '+1', 'gain'); }
   }
-  for (const n of W.npcs) { const d = dist(P.x, P.y, n.x, n.y); if (d > 24) continue; n.g.position.y = Math.sin(S.t * 1.8 + n.ph) * 0.03; if (d < 7) n.g.rotation.y += angDiff(rotY(Math.atan2(P.y - n.y, P.x - n.x)), n.g.rotation.y) * Math.min(1, dt * 4); }
+  updateFolk(dt);
   for (const m of W.spins) m.rotation.z += dt * m.userData.spin * (1 + 0.4 * Math.sin(S.t * 0.5));
   for (const f of W.floats) { f.m.position.y = f.y + Math.sin(S.t * 0.9 + f.ph) * 0.25; f.m.rotation.y += dt * 0.3; }
   for (const s of W.shots) {
@@ -1656,7 +1922,7 @@ function updateOverlay() {
   const use = near ? interactTarget() : null, pr = $('prompt');
   if (use) { const tgt = use; const [x, y] = R.toScreen(tgt.x, tgt.y, tgt.h); pr.style.display = 'block'; pr.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`; const tx = (document.body.classList.contains('touch') ? 'USE: ' : '[E] ') + tgt.text; if (pr.textContent !== tx) pr.textContent = tx; } else pr.style.display = 'none';
   for (const n of W.npcs) {
-    const on = near && dist(P.x, P.y, n.x, n.y) < 9;
+    const on = near && !n.hidden && dist(P.x, P.y, n.x, n.y) < 9;
     if (!on) { if (n.lab) n.lab.style.display = 'none'; continue; }
     if (!n.lab) { n.lab = document.createElement('div'); n.lab.className = 'lab npc' + (n.shop ? ' maker' : ''); n.lab.textContent = n.name; $('fx').appendChild(n.lab); }
     const [x, y] = R.toScreen(n.x, n.y, 2.8); n.lab.style.display = 'block'; n.lab.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;

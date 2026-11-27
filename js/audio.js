@@ -75,6 +75,9 @@ export class Audio {
       case 'whistle': this.tone('sine', 1300, 2100, 0.16, 0.2); this.tone('sine', 1500, 2500, 0.22, 0.2, 0.2); break;
       case 'hoof': this.noise(0.05, 500, 180, 0.12, 1.2); break;
       case 'fire': this.noise(0.5, 300, 2400, 0.25, 0.8); this.tone('triangle', 220, 440, 0.4, 0.1); break;
+      // town work
+      case 'chop': this.tone('square', 150, 70, 0.07, 0.14 * (0.3 + a)); this.noise(0.08, 1100, 300, 0.22 * (0.3 + a), 1.6); break;
+      case 'clink': this.tone('triangle', 1760, 1700, 0.35, 0.08 * (0.3 + a)); this.tone('sine', 2640, 2600, 0.25, 0.05 * (0.3 + a)); this.noise(0.04, 4000, 2500, 0.1 * (0.3 + a), 3); break;
       // things breaking
       case 'knock': this.tone('square', 180, 120, 0.06, 0.12); this.noise(0.07, 900, 400, 0.22, 2); break;
       case 'chip': this.noise(0.08, 3200, 1400, 0.22, 3); this.tone('triangle', 900, 600, 0.05, 0.06); break;
