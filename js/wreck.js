@@ -15,7 +15,7 @@ export const BREAK = {
   hay: { hp: 1.5, n: 12, soft: 1, burn: 1 },
   logs: { hp: 4, n: 12, wood: 1, burn: 1, loot: 2 },
   shack: { hp: 11, n: 40, wood: 1, burn: 1, loot: 6 },
-  tent: { hp: 2.5, n: 12, soft: 1, burn: 1, loot: 2 },
+  tent: { hp: 2.5, n: 26, soft: 1, burn: 1, loot: 2 },
   shelf: { hp: 3, n: 16, wood: 1, burn: 1, books: 1 },
   ruinwall: { hp: 9, n: 34, wood: 1, burn: 1, books: 1 },
   hull: { hp: 9, n: 30, wood: 1, burn: 1, loot: 3 },

@@ -914,7 +914,7 @@ function buildFolk(B) {
     if (fld) {
       const ux = (n.x - fld.x) / (dist(n.x, n.y, fld.x, fld.y) || 1), uy = (n.y - fld.y) / (dist(n.x, n.y, fld.x, fld.y) || 1), vx = -uy, vy = ux, pts = [];
       for (let r = 0; r < 9; r++) { const off = fld.r * 0.72 - r * 0.62, L = Math.sqrt(Math.max(0, (fld.r * 0.86) ** 2 - off * off)); const cx = fld.x + ux * off, cy = fld.y + uy * off, e = [[cx - vx * L, cy - vy * L], [cx + vx * L, cy + vy * L]]; if (r % 2) e.reverse(); pts.push(e[0], e[1]); }
-      band = { pts, ox: true, land: n.land };
+      band = { pts, ox: true, land: n.land, vx, vy, fx: fld.x, fy: fld.y, fr: fld.r * 0.86 };
     } else {
       const g0 = tw.spot([n.r + 2.6, n.r + 3.4, n.r + 2.0]);
       if (g0) { const a = g0[2], ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux, pts = []; for (let r = 0; r < 5; r++) { const cx = g0[0] + ux * (r * 0.55 - 1.1), cy = g0[1] + uy * (r * 0.55 - 1.1), e = [[cx - vx * 1.8, cy - vy * 1.8], [cx + vx * 1.8, cy + vy * 1.8]]; if (r % 2) e.reverse(); pts.push(e[0], e[1]); } band = { pts, ox: false, land: n.land }; }
@@ -956,6 +956,38 @@ function squarePoint(n) { const tn = n.town; for (let i = 0; i < 10; i++) { cons
 function safeDoor(n, foe) { const ds = n.T ? n.T.doors : (W.towns.find(t => t.n === n.town) || { doors: [[n.x, n.y]] }).doors; let b = ds[0], bs = -1e9; for (const d of ds) { const sc = -dist(d[0], d[1], n.x, n.y) + 1.6 * Math.min(6, dist(d[0], d[1], foe.x, foe.y)); if (sc > bs) { bs = sc; b = d; } } return b; }
 function nearestDoor(n) { let b = null, bd = 1e9; for (const d of n.T ? n.T.doors : W.towns.find(t => t.n === n.town).doors) { const q = dist(d[0], d[1], n.x, n.y); if (q < bd) { bd = q; b = d; } } return b; }
 
+// the ox walks the rows and turns in a slow arc at each end; the ploughman is pulled along behind it like a cart
+const OXL = 2.95;
+function oxPlough(n, dt) {
+  const b = n.band, pts = b.pts, T = W.T;
+  if (n.oxx === undefined) { n.oxf = Math.atan2(pts[1][1] - pts[0][1], pts[1][0] - pts[0][0]); n.oxx = n.x + Math.cos(n.oxf) * OXL; n.oxy = n.y + Math.sin(n.oxf) * OXL; n.seg = 1; }
+  if (n.phase === 'rest') { n.oxMoving = false; return null; }
+  const tgt = n.phase === 'back' ? pts[0] : pts[n.seg];
+  if (!tgt) { n.phase = 'rest'; n.t = 0; return null; }
+  const want = Math.atan2(tgt[1] - n.oxy, tgt[0] - n.oxx), df = angDiff(want, n.oxf), dd = dist(tgt[0], tgt[1], n.oxx, n.oxy);
+  n.oxf += clamp(df, -1.5 * dt, 1.5 * dt);
+  const sp = (n.phase === 'back' ? 1.6 : 1.05) * Math.max(0.18, Math.cos(df)) * (dd < 1 && Math.abs(df) > 0.6 ? 0.4 : 1);
+  n.oxx += Math.cos(n.oxf) * sp * dt; n.oxy += Math.sin(n.oxf) * sp * dt; n.oxMoving = true;
+  if (dd < 0.45) { if (n.phase === 'back') { n.phase = 'plough'; n.seg = 1; } else n.seg++; }
+  // the ploughman and the plough walk in the ox's own tracks, so the team turns together in one arc
+  const tr = n.trail || (n.trail = [[n.x, n.y], [n.oxx, n.oxy]]), last = tr[tr.length - 1];
+  if (Math.hypot(n.oxx - last[0], n.oxy - last[1]) > 0.06) { tr.push([n.oxx, n.oxy]); if (tr.length > 160) tr.shift(); }
+  const back = (len) => { let acc = 0, ax = n.oxx, ay = n.oxy; for (let k = tr.length - 1; k >= 0; k--) { const [qx, qy] = tr[k], l = Math.hypot(ax - qx, ay - qy); if (acc + l >= len) { const u = (len - acc) / (l || 1); return [ax + (qx - ax) * u, ay + (qy - ay) * u]; } acc += l; ax = qx; ay = qy; } return [ax, ay]; };
+  const [hx, hy] = back(OXL), [bx, by] = back(OXL - 0.9), mx = hx - n.x, my = hy - n.y, md = Math.hypot(mx, my), step = Math.min(md, 3.5 * dt);
+  if (md > 0.001) { n.x += mx / md * step; n.y += my / md * step; }
+  n.face = Math.atan2(by - n.y, bx - n.x); n.walking = sp > 0.3;
+  // the blade cuts only along the rows, inside the field, not on the turns
+  if (n.phase === 'plough' && Math.abs(Math.cos(n.face) * b.vx + Math.sin(n.face) * b.vy) > 0.9 && dist(bx, by, b.fx, b.fy) < b.fr) {
+    const c0x = Math.floor((bx - 0.3) * 8), c1x = Math.floor((bx + 0.3) * 8), c0y = Math.floor((by - 0.3) * 8), c1y = Math.floor((by + 0.3) * 8);
+    for (let cy = c0y; cy <= c1y; cy++) for (let cx = c0x; cx <= c1x; cx++) {
+      if (cx < 0 || cy < 0 || cx >= T.w || cy >= T.h) continue; const i = cy * T.w + cx; if (T.solid[i] || Math.hypot((cx + 0.5) / 8 - bx, (cy + 0.5) / 8 - by) > 0.3) continue;
+      if (!n.cells.has(i)) n.cells.set(i, T.data.slice(i * 4, i * 4 + 4));
+      const k = n.cells.get(i)[3] & 128; T.put(cx, cy, (cx + cy) % 3 ? '=' : '~', b.land * 16 + 10, 0.5 + ((cx * 7 + cy * 3) % 5) * 0.05, k); W.fireDirty = true;
+    }
+    if (Math.random() < dt * 6) burst(bx, by, 0.2, 1, 0xc8a070, 1.6);
+  }
+  return [bx, by];
+}
 function plough(n, dt) {
   const b = n.band, pts = b.pts, T = W.T;
   if (n.phase === 'rest') { n.t += dt; if (n.t > 7) { n.phase = 'grow'; n.t = 0; } return null; }
@@ -964,6 +996,7 @@ function plough(n, dt) {
     for (const [i, v] of n.cells) { if (T.fire && T.fire[i]) continue; T.data.set(v, i * 4); }
     n.cells.clear(); W.fireDirty = true; n.phase = 'back'; n.seg = 0; burst(n.x, n.y, 1.2, 10, 0x9be070, 3); return null;
   }
+  if (b.ox) return oxPlough(n, dt);
   if (n.phase === 'back') { if (folkMove(n, pts[0][0], pts[0][1], n.spd * 1.4, dt, true)) { n.phase = 'plough'; n.seg = 0; } return null; }
   const a = pts[n.seg], c = pts[n.seg + 1]; if (!c) { n.phase = 'rest'; n.t = 0; return null; }
   const done = folkMove(n, c[0], c[1], b.ox ? 1.05 : 0.8, dt, true); n.stuck = 0;
@@ -1006,12 +1039,12 @@ function updateFolk(dt) {
     }
     if (n.st !== 'flee') {
       // the Scribe comes close: stop, turn, and sometimes say hello
-      const busy = n.role === 'farmer' && n.phase === 'plough';
+      const busy = n.role === 'farmer' && (n.phase === 'plough' || n.phase === 'back');
       if (dp < 3.4 && !busy && n.role !== 'kid' && n.greetT <= 0 && S.mode === 'play' && S.t - (W.greetT || -9) > 3) { W.greetT = S.t; n.greetT = 60 + Math.random() * 40; folkSay(n, pickOf(GREET)); n.wave = 1.4; n.lookT = 1.8; }
       if (n.role === 'idle' && dp < 7) lookP = true;
       if (n.talkT > 0 || n.lookT > 0) lookP = true;
       // step out of the way of the Scribe, more so of a horse
-      const room = P.mounted ? 1.6 : 0.85; if (dp < room && n.role !== 'maker' && n.role !== 'idle') { const a = Math.atan2(n.y - P.y, n.x - P.x); folkMove(n, n.x + Math.cos(a) * 0.6, n.y + Math.sin(a) * 0.6, 4, dt); }
+      const room = P.mounted ? 1.6 : 0.85; if (dp < room && n.role !== 'maker' && n.role !== 'idle' && !n.ox) { const a = Math.atan2(n.y - P.y, n.x - P.x); folkMove(n, n.x + Math.cos(a) * 0.6, n.y + Math.sin(a) * 0.6, 4, dt); }
       if (!lookP) switch (n.role) {
         case 'walker': {
           if (n.st === 'chat') {
@@ -1076,8 +1109,8 @@ function updateFolk(dt) {
           armL = Math.sin(n.t * 16) * 0.9; armR = -armL; break;
         }
         case 'farmer': {
-          const blade = plough(n, dt);
-          if (n.ox) { const a = n.face, ox = n.x + Math.cos(a) * 2.95, oy = n.y + Math.sin(a) * 2.95; place(n.ox, ox, oy); n.ox.rotation.y = rotY(a); const go = n.phase === 'plough' || n.phase === 'back'; n.ox.userData.legs.forEach((l, i) => { l.rotation.x = go ? Math.sin(S.t * 7 + (i % 2) * Math.PI + (i > 1 ? Math.PI / 2 : 0)) * 0.45 : 0; }); n.ox.userData.head.rotation.x = Math.sin(S.t * (go ? 3.5 : 0.8)) * 0.1; }
+          n.oxMoving = false; const blade = plough(n, dt);
+          if (n.ox) { const pl = n.ox.userData.plough; if (pl.parent !== R.root) R.root.add(pl); if (blade) { place(pl, blade[0], blade[1]); pl.rotation.y = rotY(n.face); } place(n.ox, n.oxx, n.oxy); n.ox.rotation.y = rotY(n.oxf); const go = n.oxMoving; n.ox.userData.legs.forEach((l, i) => { l.rotation.x = go ? Math.sin(S.t * 7 + (i % 2) * Math.PI + (i > 1 ? Math.PI / 2 : 0)) * 0.45 : 0; }); n.ox.userData.head.rotation.x = Math.sin(S.t * (go ? 3.5 : 0.8)) * 0.1; }
           if (n.phase === 'plough') { armR = armL = -1.0; if (!n.ox) { const c = (n.t * 1.2) % 1; armR = armL = -0.4 - Math.sin(c * Math.PI) * 1.6; } if (n.ox && Math.random() < dt * 0.05) folkSay(n, pickOf(['Hup!', 'Straight, now.', 'Easy, girl.']), '', 1.4); }
           if (n.phase === 'rest') { armL = -0.2; armR = -0.2; }
           if (blade && n.ox && dp < 18 && Math.random() < dt * 1.2) audio.play('step');
